@@ -7,9 +7,6 @@ import {
   CheckCircle2, 
   Calendar as CalendarIcon, 
   Sparkles, 
-  GraduationCap, 
-  Palette, 
-  Briefcase, 
   Award, 
   Share2, 
   Copy, 
@@ -88,13 +85,13 @@ export const AnalyticsTab: React.FC = () => {
     todayCompletedCount,
     todayActive,
     rows,
-    examCompleted,
-    artCompleted,
-    workCompleted,
-    totalDomainCompleted,
-    examPct,
-    artPct,
-    workPct,
+    urgentCompleted,
+    highCompleted,
+    routineCompleted,
+    totalPriorityCompleted,
+    urgentPct,
+    highPct,
+    routinePct,
     badges,
     unlockedBadgesCount
   } = useMemo(() => {
@@ -204,18 +201,17 @@ export const AnalyticsTab: React.FC = () => {
       rows[rowIndex].push(d);
     });
 
-    // 4. Energy Distribution across 3 Domains: Exam, Art, Work
-    const examCompleted = tasks.filter(t => (t.completed || t.isCompleted) && (t.persona === 'exam' || t.category === 'exam')).length;
-    const artCompleted = tasks.filter(t => (t.completed || t.isCompleted) && (t.persona === 'art' || t.category === 'art')).length;
-    const workCompleted = tasks.filter(t => (t.completed || t.isCompleted) && (t.persona === 'security' || t.persona === 'general' || t.category === 'daily' || t.category === 'emergency')).length;
+    // 4. Universal Priority Distribution across Completed Tasks
+    const urgentCompleted = tasks.filter(t => (t.completed || t.isCompleted) && (t.isEmergency || t.priority === 'urgent')).length;
+    const highCompleted = tasks.filter(t => (t.completed || t.isCompleted) && t.priority === 'high').length;
+    const routineCompleted = tasks.filter(t => (t.completed || t.isCompleted) && t.priority !== 'urgent' && t.priority !== 'high').length;
 
-    const totalDomainCompleted = examCompleted + artCompleted + workCompleted;
-    const examPct = totalDomainCompleted > 0 ? Math.round((examCompleted / totalDomainCompleted) * 100) : 0;
-    const artPct = totalDomainCompleted > 0 ? Math.round((artCompleted / totalDomainCompleted) * 100) : 0;
-    const workPct = totalDomainCompleted > 0 ? Math.max(0, 100 - examPct - artPct) : 0;
+    const totalPriorityCompleted = urgentCompleted + highCompleted + routineCompleted;
+    const urgentPct = totalPriorityCompleted > 0 ? Math.round((urgentCompleted / totalPriorityCompleted) * 100) : 0;
+    const highPct = totalPriorityCompleted > 0 ? Math.round((highCompleted / totalPriorityCompleted) * 100) : 0;
+    const routinePct = totalPriorityCompleted > 0 ? Math.max(0, 100 - urgentPct - highPct) : 0;
 
-    // 5. Badges Wall Data
-    const resolvedEmergencies = tasks.filter(t => (t.isEmergency || t.periodType === 'emergency') && (t.completed || t.isCompleted)).length;
+    // 5. Universal Badges Wall Data
     const badges: BadgeItem[] = [
       {
         id: 'first_step',
@@ -227,6 +223,15 @@ export const AnalyticsTab: React.FC = () => {
         unlockedAt: '初始里程碑',
       },
       {
+        id: 'three_days',
+        title: '习惯萌芽',
+        icon: '🌱',
+        desc: '连续 3 天不间断保持任务打卡或专注',
+        unlocked: currentStreak >= 3 || longestStreak >= 3,
+        progressText: (currentStreak >= 3 || longestStreak >= 3) ? '已达成' : `${currentStreak}/3 天`,
+        unlockedAt: '习惯养成初阶',
+      },
+      {
         id: 'seven_days',
         title: '七日流光',
         icon: '🔥',
@@ -236,7 +241,16 @@ export const AnalyticsTab: React.FC = () => {
         unlockedAt: '连续打卡卓越',
       },
       {
-        id: 'deep_flow',
+        id: 'thirty_days',
+        title: '坚毅恒心',
+        icon: '💎',
+        desc: '连续打卡达到 30 天，自律成为本能',
+        unlocked: currentStreak >= 30 || longestStreak >= 30,
+        progressText: (currentStreak >= 30 || longestStreak >= 30) ? '已达成' : `${currentStreak}/30 天`,
+        unlockedAt: '自律大师荣耀',
+      },
+      {
+        id: 'deep_flow_1h',
         title: '心流探索者',
         icon: '⏳',
         desc: '累计深度番茄钟专注时长超过 60 分钟',
@@ -245,49 +259,31 @@ export const AnalyticsTab: React.FC = () => {
         unlockedAt: '专注达人认证',
       },
       {
-        id: 'emergency_shield',
-        title: '敏捷防线',
-        icon: '🚨',
-        desc: '成功响应并闭环处置至少 1 起工作突发事件',
-        unlocked: resolvedEmergencies >= 1,
-        progressText: resolvedEmergencies >= 1 ? '已达成' : `${resolvedEmergencies}/1 起突发`,
-        unlockedAt: '突发处置专家',
+        id: 'deep_flow_5h',
+        title: '深度专注大师',
+        icon: '⚡',
+        desc: '累计深度番茄钟专注时长超过 300 分钟 (5小时)',
+        unlocked: totalFocusMinutes >= 300,
+        progressText: totalFocusMinutes >= 300 ? '已达成' : `${totalFocusMinutes}/300 分钟`,
+        unlockedAt: '心流大师认证',
       },
       {
-        id: 'art_creator',
-        title: '灵感造物',
-        icon: '🎨',
-        desc: '推进或完成绘画商业画稿企划',
-        unlocked: artCompleted >= 1,
-        progressText: artCompleted >= 1 ? '已达成' : `${artCompleted}/1 企划`,
-        unlockedAt: '艺术灵感认证',
+        id: 'tasks_10',
+        title: '执行先锋',
+        icon: '🎯',
+        desc: '累计完成超过 10 项待办事项',
+        unlocked: totalCompletedCount >= 10,
+        progressText: totalCompletedCount >= 10 ? '已达成' : `${totalCompletedCount}/10 项`,
+        unlockedAt: '行动力先锋',
       },
       {
-        id: 'exam_scholar',
-        title: '研途破浪',
-        icon: '📚',
-        desc: '完成考研核心背诵或真题模拟练习',
-        unlocked: examCompleted >= 2,
-        progressText: examCompleted >= 2 ? '已达成' : `${examCompleted}/2 项备考`,
-        unlockedAt: '上岸先锋',
-      },
-      {
-        id: 'zenith_master',
-        title: '知行合一',
-        icon: '👑',
-        desc: '在考研、绘画、工作中实现多维精力全面推进',
-        unlocked: examCompleted >= 1 && artCompleted >= 1 && workCompleted >= 1,
-        progressText: (examCompleted >= 1 && artCompleted >= 1 && workCompleted >= 1) ? '已达成' : '需各领域各完成 1 项',
-        unlockedAt: '全能自律大师',
-      },
-      {
-        id: 'hundred_tasks',
+        id: 'tasks_50',
         title: '百炼成钢',
         icon: '🏆',
-        desc: '累计完成超过 20 项待办事项',
-        unlocked: totalCompletedCount >= 20,
-        progressText: totalCompletedCount >= 20 ? '已达成' : `${totalCompletedCount}/20 项`,
-        unlockedAt: '坚韧不拔荣耀',
+        desc: '累计完成超过 50 项待办事项',
+        unlocked: totalCompletedCount >= 50,
+        progressText: totalCompletedCount >= 50 ? '已达成' : `${totalCompletedCount}/50 项`,
+        unlockedAt: '高效能楷模',
       },
     ];
 
@@ -302,13 +298,13 @@ export const AnalyticsTab: React.FC = () => {
       todayCompletedCount,
       todayActive,
       rows,
-      examCompleted,
-      artCompleted,
-      workCompleted,
-      totalDomainCompleted,
-      examPct,
-      artPct,
-      workPct,
+      urgentCompleted,
+      highCompleted,
+      routineCompleted,
+      totalPriorityCompleted,
+      urgentPct,
+      highPct,
+      routinePct,
       badges,
       unlockedBadgesCount
     };
@@ -545,7 +541,7 @@ export const AnalyticsTab: React.FC = () => {
         )}
       </SquircleCard>
 
-      {/* 3. 三大方向精力分配与平衡图表 (Tri-Persona Energy Balance) */}
+      {/* 3. 任务优先级与专注执行结构 (Universal Priority & Execution Breakdown) */}
       <SquircleCard className="relative overflow-hidden p-4 border border-white/20 dark:border-white/10 shadow-squircle">
         <div 
           aria-hidden="true" 
@@ -556,72 +552,72 @@ export const AnalyticsTab: React.FC = () => {
           <div className="flex items-center space-x-2">
             <Target className="w-4 h-4 text-theme-accent" />
             <h3 className="text-xs font-bold text-theme-text uppercase tracking-wider">
-              多维精力平衡 · 考研 / 绘画 / 工作
+              全域执行效能 · 优先级与结构分布
             </h3>
           </div>
-          <span className="text-[10px] text-theme-text-muted">基于已打卡任务与工时</span>
+          <span className="text-[10px] text-theme-text-muted">基于已打卡任务与专注积累</span>
         </div>
 
         {/* 综合进度条 */}
         <div className="h-3 w-full bg-theme-card-subtle rounded-full overflow-hidden flex border border-white/10 p-0.5 mb-3">
           <div 
-            style={{ width: `${examPct}%` }} 
-            className="h-full bg-blue-500 rounded-l-full transition-all duration-500 shadow-sm" 
-            title={`考研: ${examPct}%`} 
+            style={{ width: `${urgentPct}%` }} 
+            className="h-full bg-rose-500 rounded-l-full transition-all duration-500 shadow-sm" 
+            title={`紧急/突发: ${urgentPct}%`} 
           />
           <div 
-            style={{ width: `${artPct}%` }} 
-            className="h-full bg-purple-500 transition-all duration-500 shadow-sm" 
-            title={`绘画: ${artPct}%`} 
+            style={{ width: `${highPct}%` }} 
+            className="h-full bg-amber-500 transition-all duration-500 shadow-sm" 
+            title={`重要高优: ${highPct}%`} 
           />
           <div 
-            style={{ width: `${workPct}%` }} 
+            style={{ width: `${routinePct}%` }} 
             className="h-full bg-emerald-500 rounded-r-full transition-all duration-500 shadow-sm" 
-            title={`工作: ${workPct}%`} 
+            title={`日常常规: ${routinePct}%`} 
           />
         </div>
 
-        {/* 三大方向明细小卡 */}
+        {/* 优先级明细小卡 */}
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
-            <div className="flex items-center justify-center space-x-1 text-[11px] font-bold text-blue-400">
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>考研研途</span>
+          <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
+            <div className="flex items-center justify-center space-x-1 text-[11px] font-bold text-rose-500">
+              <Zap className="w-3.5 h-3.5" />
+              <span>紧急突发</span>
             </div>
-            <div className="text-sm font-black text-theme-text mt-1">{examCompleted} 项</div>
-            <span className="text-[10px] text-theme-text-muted">{examPct}% 精力</span>
+            <div className="text-sm font-black text-theme-text mt-1">{urgentCompleted} 项</div>
+            <span className="text-[10px] text-theme-text-muted">{urgentPct}% 占比</span>
           </div>
 
-          <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
-            <div className="flex items-center justify-center space-x-1 text-[11px] font-bold text-purple-400">
-              <Palette className="w-3.5 h-3.5" />
-              <span>商业绘画</span>
+          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-center justify-center space-x-1 text-[11px] font-bold text-amber-500">
+              <Target className="w-3.5 h-3.5" />
+              <span>重要核心</span>
             </div>
-            <div className="text-sm font-black text-theme-text mt-1">{artCompleted} 项</div>
-            <span className="text-[10px] text-theme-text-muted">{artPct}% 精力</span>
+            <div className="text-sm font-black text-theme-text mt-1">{highCompleted} 项</div>
+            <span className="text-[10px] text-theme-text-muted">{highPct}% 占比</span>
           </div>
 
           <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <div className="flex items-center justify-center space-x-1 text-[11px] font-bold text-emerald-400">
-              <Briefcase className="w-3.5 h-3.5" />
-              <span>日常工作</span>
+            <div className="flex items-center justify-center space-x-1 text-[11px] font-bold text-emerald-500">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>日常稳步</span>
             </div>
-            <div className="text-sm font-black text-theme-text mt-1">{workCompleted} 项</div>
-            <span className="text-[10px] text-theme-text-muted">{workPct}% 精力</span>
+            <div className="text-sm font-black text-theme-text mt-1">{routineCompleted} 项</div>
+            <span className="text-[10px] text-theme-text-muted">{routinePct}% 占比</span>
           </div>
         </div>
 
-        {/* 智能心流评语 */}
+        {/* 智能自律心流评语 */}
         <div className="mt-3 p-2 rounded-squircle bg-theme-card-subtle border border-theme-border/60 flex items-start space-x-2">
           <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
           <p className="text-[11px] text-theme-text-secondary leading-relaxed">
-            {totalDomainCompleted === 0
+            {totalPriorityCompleted === 0
               ? '当前暂无打卡数据，创建并完成你的第一项待办即可开始积累心流！'
-              : examPct > 40 
-              ? '当前精力高度倾斜在考研冲刺，各学科复习节奏扎实，继续保持高强度心流！' 
-              : artPct > 40 
-              ? '当前绘画商单推进热烈，灵感处于峰值阶段，注意合理穿插休息！'
-              : '考研备考、艺术创作与工作交接保持平稳节奏，知行合一，多点开花！'}
+              : currentStreak >= 7
+              ? `已保持连续 ${currentStreak} 天高质量自律，待办事项按部就班推进，持续保持专注节奏！`
+              : urgentPct > 40 
+              ? '近期突发与紧急事项响应迅速，建议合理平衡长期目标与日常常规事项！' 
+              : '任务执行节奏稳健，重点明确，知行合一，多点开花！'}
           </p>
         </div>
       </SquircleCard>

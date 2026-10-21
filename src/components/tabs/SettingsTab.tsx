@@ -7,19 +7,24 @@ import {
   HardDrive, 
   FileSpreadsheet, 
   RotateCcw, 
-  Layout,
   Bell,
   ChevronRight,
   List,
   Plus,
-  MessageSquarePlus
+  MessageSquarePlus,
+  Settings2,
+  GraduationCap,
+  Palette,
+  Briefcase,
+  Trash2,
+  Layers
 } from 'lucide-react';
 import { SquircleCard } from '../common/SquircleCard';
 import { PillTag } from '../common/PillTag';
 import { useThemeStore } from '../../stores/useThemeStore';
-import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useTaskStore } from '../../stores/useTaskStore';
 import { useFocusStore } from '../../stores/useFocusStore';
+import { usePanelStore, AVAILABLE_MODULES } from '../../stores/usePanelStore';
 import { useBulletinStore } from '../../stores/useBulletinStore';
 import { useFeedbackStore } from '../../stores/useFeedbackStore';
 import { THEMES } from '../../constants/themes';
@@ -40,6 +45,7 @@ interface SettingsTabProps {
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenBackupModal }) => {
   const { theme, autoSwitch, toneLock, setTheme, setAutoSwitch, setToneLock, getEffectiveTheme } = useThemeStore();
+  const { panels, openAddPanelModal, openConfigureModal, deletePanel, addPanelFromTemplate } = usePanelStore();
   const { 
     bulletins, 
     openListModal, 
@@ -50,18 +56,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenBackupModal }) =
   const unreadBulletinCount = getUnreadCount();
   const latestBulletin = bulletins[0] || null;
   const { openFeedbackModal, feedbacks } = useFeedbackStore();
-  const { 
-    showExamCountdown, 
-    setShowExamCountdown, 
-    showDailyWork,
-    setShowDailyWork,
-    showWeeklyWork,
-    setShowWeeklyWork,
-    showMonthlyWork,
-    setShowMonthlyWork,
-    showEmergencyWork,
-    setShowEmergencyWork
-  } = useSettingsStore();
+
 
   const { exportCSV, resetAllData } = useTaskStore();
 
@@ -204,65 +199,133 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onOpenBackupModal }) =
         </div>
       </SquircleCard>
 
-      {/* 2. 界面卡片自定义显示 (解决“固定卡片无法删除移动”问题) */}
-      <SquircleCard elevation={1} radius="md" className="p-4 bg-theme-card border border-theme-border shadow-squircle space-y-2.5">
+      {/* 2. 自定义功能面板与模块管理中心 */}
+      <SquircleCard elevation={2} radius="lg" className="p-4 bg-theme-card border border-theme-border shadow-squircle space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-1.5">
-            <Layout className="w-3.5 h-3.5 text-theme-accent" />
-            <h3 className="text-xs font-bold text-theme-text">界面卡片自定义与显隐控制</h3>
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-squircle bg-theme-accent/15 border border-theme-accent/25 flex items-center justify-center text-theme-accent shrink-0">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <h3 className="text-xs font-bold text-theme-text">自定义功能面板与特定模块</h3>
+                <PillTag variant="accent" size="sm" label={`${panels.length} 个面板`} />
+              </div>
+              <p className="text-[11px] text-theme-text-muted mt-0.5">
+                考研、绘画、工作流等已转为自由添加模板，可按需启用或移除
+              </p>
+            </div>
           </div>
-          <span className="text-[10px] text-theme-text-muted">自由隐藏不需要的模块</span>
+          <button
+            onClick={() => {
+              nativeBridge.performHapticFeedback('light');
+              openAddPanelModal();
+            }}
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-squircle bg-theme-accent text-theme-accent-contrast text-xs font-medium hover:opacity-90 transition-opacity shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>添加面板</span>
+          </button>
         </div>
 
-        <div className="space-y-2 text-xs pt-1">
-          <label className="flex items-center justify-between cursor-pointer py-1 border-b border-theme-border/40">
-            <span className="text-theme-text">显示考研倒计时卡片</span>
-            <input
-              type="checkbox"
-              checked={showExamCountdown}
-              onChange={e => setShowExamCountdown(e.target.checked)}
-              className="accent-theme-accent w-4 h-4 rounded"
-            />
-          </label>
-          <label className="flex items-center justify-between cursor-pointer py-1 border-b border-theme-border/40">
-            <span className="text-theme-text">显示工作 - 日常栏目</span>
-            <input
-              type="checkbox"
-              checked={showDailyWork}
-              onChange={e => setShowDailyWork(e.target.checked)}
-              className="accent-theme-accent w-4 h-4 rounded"
-            />
-          </label>
-          <label className="flex items-center justify-between cursor-pointer py-1 border-b border-theme-border/40">
-            <span className="text-theme-text">显示工作 - 周常栏目</span>
-            <input
-              type="checkbox"
-              checked={showWeeklyWork}
-              onChange={e => setShowWeeklyWork(e.target.checked)}
-              className="accent-theme-accent w-4 h-4 rounded"
-            />
-          </label>
-          <label className="flex items-center justify-between cursor-pointer py-1 border-b border-theme-border/40">
-            <span className="text-theme-text flex items-center space-x-1">
-              <span>显示工作 - 🚨 突发事件栏目</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={showEmergencyWork}
-              onChange={e => setShowEmergencyWork(e.target.checked)}
-              className="accent-theme-accent w-4 h-4 rounded"
-            />
-          </label>
-          <label className="flex items-center justify-between cursor-pointer py-1">
-            <span className="text-theme-text">显示工作 - 月常栏目</span>
-            <input
-              type="checkbox"
-              checked={showMonthlyWork}
-              onChange={e => setShowMonthlyWork(e.target.checked)}
-              className="accent-theme-accent w-4 h-4 rounded"
-            />
-          </label>
-        </div>
+        {/* 当前已启用的自定义面板列表 */}
+        {panels.length === 0 ? (
+          <div className="p-3.5 rounded-squircle bg-theme-bg/60 border border-dashed border-theme-border text-center space-y-2">
+            <p className="text-xs text-theme-text-muted">
+              当前仅保留基础通用待办、成就与设置。
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <button
+                onClick={() => {
+                  nativeBridge.performHapticFeedback('light');
+                  addPanelFromTemplate('exam');
+                }}
+                className="px-2 py-1 rounded-squircle bg-theme-accent/10 hover:bg-theme-accent/20 text-theme-accent text-[11px] font-medium flex items-center space-x-1 transition-colors"
+              >
+                <GraduationCap className="w-3 h-3" />
+                <span>+ 启用考研攻坚面板</span>
+              </button>
+              <button
+                onClick={() => {
+                  nativeBridge.performHapticFeedback('light');
+                  addPanelFromTemplate('art');
+                }}
+                className="px-2 py-1 rounded-squircle bg-theme-accent/10 hover:bg-theme-accent/20 text-theme-accent text-[11px] font-medium flex items-center space-x-1 transition-colors"
+              >
+                <Palette className="w-3 h-3" />
+                <span>+ 启用绘画创作面板</span>
+              </button>
+              <button
+                onClick={() => {
+                  nativeBridge.performHapticFeedback('light');
+                  addPanelFromTemplate('work');
+                }}
+                className="px-2 py-1 rounded-squircle bg-theme-accent/10 hover:bg-theme-accent/20 text-theme-accent text-[11px] font-medium flex items-center space-x-1 transition-colors"
+              >
+                <Briefcase className="w-3 h-3" />
+                <span>+ 启用职场工作流面板</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 pt-1">
+            {panels.map(panel => {
+              const moduleNames = panel.enabledModules
+                .map(m => AVAILABLE_MODULES.find(am => am.type === m)?.name || m)
+                .join('、');
+
+              return (
+                <div
+                  key={panel.id}
+                  className="flex items-center justify-between p-2.5 rounded-squircle bg-theme-bg/60 border border-theme-border/60 hover:border-theme-border transition-colors"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold text-xs text-theme-text">{panel.name}</span>
+                      <span className="text-[10px] text-theme-text-muted px-1.5 py-0.5 rounded-full bg-theme-card border border-theme-border">
+                        {panel.enabledModules.length} 个功能模块
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-theme-text-secondary truncate mt-0.5">
+                      {moduleNames || '暂无开启功能模块'}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        nativeBridge.performHapticFeedback('light');
+                        openConfigureModal(panel.id);
+                      }}
+                      className="p-1.5 rounded-squircle hover:bg-theme-accent/15 text-theme-accent transition-colors"
+                      title="配置此面板功能模块"
+                    >
+                      <Settings2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        nativeBridge.performHapticFeedback('light');
+                        toast.confirm({
+                          title: `删除面板「${panel.name}」？`,
+                          message: '删除此自定义面板不会删除已建立的任务数据，任务仍可在全部待办中查看。',
+                          confirmText: '确认删除',
+                          cancelText: '取消',
+                          danger: true,
+                          onConfirm: () => {
+                            deletePanel(panel.id);
+                          }
+                        });
+                      }}
+                      className="p-1.5 rounded-squircle hover:bg-rose-500/15 text-theme-text-muted hover:text-rose-500 transition-colors"
+                      title="删除面板"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </SquircleCard>
 
       {/* 3. 通知公告与更新日志中心 */}

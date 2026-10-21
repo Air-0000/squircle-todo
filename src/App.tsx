@@ -28,12 +28,16 @@ import { DynamicIslandCapsule } from './components/focus/DynamicIslandCapsule';
 
 // Layout & Tabs
 import { BottomTabBar, MainTabType } from './components/layout/BottomTabBar';
+import { UniversalTasksTab } from './components/tabs/UniversalTasksTab';
+import { ModularPanelView } from './components/panels/ModularPanelView';
 import { ExamTab } from './components/tabs/ExamTab';
 import { ArtTab } from './components/tabs/ArtTab';
 import { WorkTab } from './components/tabs/WorkTab';
 import { AnalyticsTab } from './components/tabs/AnalyticsTab';
 import { CalendarTab } from './components/tabs/CalendarTab';
 import { SettingsTab } from './components/tabs/SettingsTab';
+import { usePanelStore } from './stores/usePanelStore';
+import { FolderPlus } from 'lucide-react';
 
 // Modals
 import { SmartAddTaskModal } from './components/modals/SmartAddTaskModal';
@@ -43,6 +47,8 @@ import { BulletinModal } from './components/modals/BulletinModal';
 import { BulletinListModal } from './components/modals/BulletinListModal';
 import { PublishBulletinModal } from './components/modals/PublishBulletinModal';
 import { FeedbackModal } from './components/modals/FeedbackModal';
+import { AddPanelModal } from './components/modals/AddPanelModal';
+import { ConfigureModulesModal } from './components/modals/ConfigureModulesModal';
 
 export const App: React.FC = () => {
   // Activate automatic theme clock scheduler & announcements
@@ -76,8 +82,10 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [checkAndRefreshCycles]);
 
-  // Navigation: 5 core tabs (考研, 绘画, 工作, 日历参考, 设置)
-  const [activeTab, setActiveTab] = useState<MainTabType>('work');
+  const { panels } = usePanelStore();
+
+  // Navigation: base tabs (待办: 'tasks', 成就: 'analytics', 设置: 'settings') + dynamic custom panels
+  const [activeTab, setActiveTab] = useState<MainTabType>('tasks');
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -90,10 +98,21 @@ export const App: React.FC = () => {
 
   const handleTabChange = (newTab: MainTabType) => {
     setActiveTab(newTab);
-    if (newTab === 'exam') setActivePersona('exam');
-    else if (newTab === 'art') setActivePersona('art');
-    else if (newTab === 'work') setActivePersona('security');
-    else setActivePersona('custom');
+    const targetPanel = panels.find(p => p.id === newTab);
+    if (targetPanel) {
+      if (targetPanel.templateId === 'exam') setActivePersona('exam');
+      else if (targetPanel.templateId === 'art') setActivePersona('art');
+      else if (targetPanel.templateId === 'work') setActivePersona('security');
+      else setActivePersona('custom');
+    } else if (newTab === 'exam') {
+      setActivePersona('exam');
+    } else if (newTab === 'art') {
+      setActivePersona('art');
+    } else if (newTab === 'work') {
+      setActivePersona('security');
+    } else {
+      setActivePersona('general');
+    }
   };
 
   const handleOpenAddForWork = (period: 'daily' | 'weekly' | 'monthly' | 'emergency' = 'daily') => {
@@ -102,8 +121,9 @@ export const App: React.FC = () => {
   };
 
   const handleOpenAddForCurrentTab = () => {
-    if (activeTab === 'exam') setDefaultAddCategory('exam');
-    else if (activeTab === 'art') setDefaultAddCategory('art');
+    const activePanel = panels.find(p => p.id === activeTab);
+    if (activePanel?.templateId === 'exam' || activeTab === 'exam') setDefaultAddCategory('exam');
+    else if (activePanel?.templateId === 'art' || activeTab === 'art') setDefaultAddCategory('art');
     else setDefaultAddCategory('daily');
     setIsAddModalOpen(true);
   };
@@ -115,6 +135,38 @@ export const App: React.FC = () => {
   };
 
   const getTabHeaderInfo = (tab: MainTabType) => {
+    if (tab === 'tasks') {
+      return {
+        title: '待办清单',
+        subtitle: '灵动待办 · 周期自适应 · 突发响应',
+        icon: <CheckCircle2 className="w-4 h-4 text-theme-accent" />
+      };
+    }
+    if (tab === 'analytics') {
+      return {
+        title: '专注成就',
+        subtitle: '连续打卡 · 专注时长 · 勋章沉淀',
+        icon: <Flame className="w-4 h-4 text-theme-accent" />
+      };
+    }
+    if (tab === 'settings') {
+      return {
+        title: '偏好设置',
+        subtitle: '外观主题 · 自定义面板 · 数据备份',
+        icon: <Settings className="w-4 h-4 text-theme-accent" />
+      };
+    }
+    const foundPanel = panels.find(p => p.id === tab);
+    if (foundPanel) {
+      return {
+        title: foundPanel.name,
+        subtitle: foundPanel.description || '自定义功能看板',
+        icon: foundPanel.templateId === 'exam' ? <GraduationCap className="w-4 h-4 text-theme-accent" /> :
+              foundPanel.templateId === 'art' ? <Palette className="w-4 h-4 text-theme-accent" /> :
+              foundPanel.templateId === 'work' ? <Briefcase className="w-4 h-4 text-theme-accent" /> :
+              <FolderPlus className="w-4 h-4 text-theme-accent" />
+      };
+    }
     switch (tab) {
       case 'exam':
         return {
@@ -134,23 +186,11 @@ export const App: React.FC = () => {
           subtitle: '日/周/月周期自适应 · 突发处置',
           icon: <Briefcase className="w-4 h-4 text-theme-accent" />
         };
-      case 'analytics':
-        return {
-          title: '专注成就',
-          subtitle: '热力图与能量沉淀',
-          icon: <Flame className="w-4 h-4 text-theme-accent" />
-        };
       case 'calendar':
         return {
           title: '日历视图',
           subtitle: '周期规划与时间轴一览',
           icon: <Calendar className="w-4 h-4 text-theme-accent" />
-        };
-      case 'settings':
-        return {
-          title: '偏好设置',
-          subtitle: '云同步 · 外观与数据备份',
-          icon: <Settings className="w-4 h-4 text-theme-accent" />
         };
       default:
         return {
@@ -237,6 +277,27 @@ export const App: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.12, ease: 'easeOut' }}
         >
+          {activeTab === 'tasks' && (
+            <UniversalTasksTab
+              onOpenAddModal={() => {
+                setDefaultAddCategory('daily');
+                setIsAddModalOpen(true);
+              }}
+              onEditTask={handleEditTask}
+              onNavigateToPanel={(panelId) => setActiveTab(panelId)}
+            />
+          )}
+
+          {activeTab === 'analytics' && (
+            <AnalyticsTab />
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsTab
+              onOpenBackupModal={() => setIsBackupModalOpen(true)}
+            />
+          )}
+
           {activeTab === 'exam' && (
             <ExamTab
               onOpenAddModal={() => {
@@ -264,10 +325,6 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'analytics' && (
-            <AnalyticsTab />
-          )}
-
           {activeTab === 'calendar' && (
             <CalendarTab
               onEditTask={handleEditTask}
@@ -275,11 +332,21 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'settings' && (
-            <SettingsTab
-              onOpenBackupModal={() => setIsBackupModalOpen(true)}
-            />
-          )}
+          {/* User Custom Modular Panels */}
+          {(() => {
+            const currentCustomPanel = panels.find(p => p.id === activeTab);
+            if (currentCustomPanel) {
+              return (
+                <ModularPanelView
+                  panel={currentCustomPanel}
+                  onEditTask={handleEditTask}
+                  onOpenAddModal={handleOpenAddForCurrentTab}
+                  onNavigateHome={() => setActiveTab('tasks')}
+                />
+              );
+            }
+            return null;
+          })()}
         </motion.div>
       </main>
 
@@ -330,6 +397,12 @@ export const App: React.FC = () => {
         isOpen={isBackupModalOpen}
         onClose={() => setIsBackupModalOpen(false)}
       />
+
+      {/* 自定义面板添加弹窗 */}
+      <AddPanelModal onSelectNewPanel={(pid) => setActiveTab(pid)} />
+
+      {/* 模块配置弹窗 */}
+      <ConfigureModulesModal />
 
       {/* 通知公告与更新日志模态框体系 */}
       <BulletinModal />

@@ -14,10 +14,12 @@ import {
   TrendingUp,
   BookTemplate,
   ListChecks,
-  Sparkles
+  Sparkles,
+  FolderPlus
 } from 'lucide-react';
 import { SquircleButton } from '../common/SquircleButton';
 import { useTaskStore } from '../../stores/useTaskStore';
+import { usePanelStore } from '../../stores/usePanelStore';
 import { PersonaType, PiecewiseStage, PiecewiseConfig, ChecklistItem } from '../../types';
 import { nativeBridge } from '../../utils/bridge';
 import { triggerConfetti } from '../common/ConfettiBurst';
@@ -167,6 +169,7 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
   onNavigateTab
 }) => {
   const { tasks, addTask } = useTaskStore();
+  const { panels } = usePanelStore();
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const nextMonthStr = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -175,8 +178,8 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
   const [title, setTitle] = useState('');
   const [importedSubtasks, setImportedSubtasks] = useState<ChecklistItem[]>([]);
   const [newStepText, setNewStepText] = useState('');
-  const [targetTab, setTargetTab] = useState<'exam' | 'art' | 'work' | 'emergency'>(
-    defaultCategory === 'emergency' ? 'emergency' : defaultCategory === 'exam' ? 'exam' : defaultCategory === 'art' ? 'art' : 'work'
+  const [targetTab, setTargetTab] = useState<string>(
+    defaultCategory === 'emergency' ? 'emergency' : defaultCategory === 'exam' ? 'exam' : defaultCategory === 'art' ? 'art' : 'tasks'
   );
 
   // Sub-category for Exam (日常打卡 vs 专项科目备考)
@@ -237,15 +240,15 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
         setTargetTab('art');
         setArtType('daily');
       } else if (defaultCategory === 'weekly') {
-        setTargetTab('work');
+        setTargetTab('tasks');
         setWorkPeriod('weekly');
         setFrequency('weekly');
       } else if (defaultCategory === 'monthly') {
-        setTargetTab('work');
+        setTargetTab('tasks');
         setWorkPeriod('monthly');
         setFrequency('monthly');
       } else {
-        setTargetTab('work');
+        setTargetTab('tasks');
         setWorkPeriod('daily');
         setFrequency('daily');
       }
@@ -259,35 +262,49 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
 
   const currentTemplate = PIECEWISE_TEMPLATES.find(t => t.id === selectedPiecewiseTemplate) || PIECEWISE_TEMPLATES[0];
 
+  const currentPanel = panels.find(p => p.id === targetTab);
+  const isExam = targetTab === 'exam' || currentPanel?.templateId === 'exam';
+  const isArt = targetTab === 'art' || currentPanel?.templateId === 'art';
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
     let persona: PersonaType = 'general';
     let periodType: 'daily' | 'weekly' | 'monthly' | 'emergency' | undefined = undefined;
-    let targetPage: MainTabType = 'work';
-    let targetPageName = '工作';
+    let targetPage: MainTabType = 'tasks';
+    let targetPageName = '待办';
 
     if (targetTab === 'emergency') {
       persona = 'security';
       periodType = 'emergency';
-      targetPage = 'work';
-      targetPageName = '工作·突发事件';
-    } else if (targetTab === 'exam') {
+      targetPage = 'tasks';
+      targetPageName = '待办·突发事件';
+    } else if (isExam) {
       persona = 'exam';
       periodType = examType === 'daily' ? 'daily' : undefined;
-      targetPage = 'exam';
+      targetPage = currentPanel ? currentPanel.id : (panels.some(p => p.id === 'exam') ? 'exam' : 'tasks');
       targetPageName = examType === 'daily' ? '考研·每日打卡' : '考研·备考科目';
-    } else if (targetTab === 'art') {
+    } else if (isArt) {
       persona = 'art';
       periodType = artType === 'daily' ? 'daily' : undefined;
-      targetPage = 'art';
+      targetPage = currentPanel ? currentPanel.id : (panels.some(p => p.id === 'art') ? 'art' : 'tasks');
       targetPageName = artType === 'daily' ? '绘画·每日打卡' : '绘画·商单排单';
     } else if (targetTab === 'work') {
       persona = 'security';
       periodType = workPeriod;
-      targetPage = 'work';
+      targetPage = currentPanel ? currentPanel.id : (panels.some(p => p.id === 'work') ? 'work' : 'tasks');
       targetPageName = workPeriod === 'daily' ? '工作·每日打卡' : workPeriod === 'weekly' ? '工作·本周重点' : '工作·本月规划';
+    } else if (currentPanel) {
+      persona = 'general';
+      periodType = workPeriod;
+      targetPage = currentPanel.id;
+      targetPageName = currentPanel.name;
+    } else {
+      persona = 'general';
+      periodType = workPeriod;
+      targetPage = 'tasks';
+      targetPageName = workPeriod === 'daily' ? '待办·每日打卡' : workPeriod === 'weekly' ? '待办·本周重点' : '待办·本月规划';
     }
 
     const isDaily = periodType === 'daily' || frequency === 'daily';
@@ -317,7 +334,7 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
       persona,
       personaId: persona,
       periodType,
-      category: periodType || (targetTab === 'exam' ? 'exam' : targetTab === 'art' ? 'art' : 'general'),
+      category: periodType || (isExam ? 'exam' : isArt ? 'art' : 'general'),
       priority: targetTab === 'emergency' ? (emergencyLevel === 'critical' ? 'urgent' : 'high') : 'high',
       isPinned: targetTab === 'emergency',
       isEmergency: targetTab === 'emergency',
@@ -332,16 +349,16 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
       subtasks: importedSubtasks,
       checklists: importedSubtasks,
 
-      clientName: targetTab === 'art' && artType === 'commission' ? clientName.trim() : undefined,
-      submitDate: targetTab === 'art' && artType === 'commission' ? submitDate : undefined,
-      examData: targetTab === 'exam' ? {
+      clientName: isArt && artType === 'commission' ? clientName.trim() : undefined,
+      submitDate: isArt && artType === 'commission' ? submitDate : undefined,
+      examData: isExam ? {
         subject: examSubject,
         ebbinghausTracking: true,
         ebbinghausRound: 0,
       } : undefined,
 
       tags: [
-        targetTab === 'emergency' ? '🚨突发事件' : targetTab === 'exam' ? (examType === 'daily' ? '考研日常' : '考研') : targetTab === 'art' ? (artType === 'daily' ? '绘画日常' : '绘画') : '工作',
+        targetTab === 'emergency' ? '🚨突发事件' : isExam ? (examType === 'daily' ? '考研日常' : '考研') : isArt ? (artType === 'daily' ? '绘画日常' : '绘画') : (currentPanel?.name || '待办'),
         isDaily ? '每日打卡' : enablePiecewise ? 'f(t)分段变化' : periodType === 'weekly' ? '周常' : periodType === 'monthly' ? '月常' : '自填'
       ],
     });
@@ -407,12 +424,17 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
                 <span>自动归类入库</span>
               </span>
             </div>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {[
-                { id: 'work', label: '工作事务', icon: Briefcase, color: 'text-amber-500' },
-                { id: 'emergency', label: '突发事件', icon: AlertTriangle, color: 'text-rose-500' },
-                { id: 'exam', label: '考研备考', icon: GraduationCap, color: 'text-indigo-500' },
-                { id: 'art', label: '绘画创作', icon: Palette, color: 'text-purple-500' },
+                { id: 'tasks', label: '通用待办', icon: ListChecks },
+                { id: 'emergency', label: '突发事件', icon: AlertTriangle },
+                ...panels.map(p => ({
+                  id: p.id,
+                  label: p.name,
+                  icon: p.templateId === 'exam' ? GraduationCap : p.templateId === 'art' ? Palette : p.templateId === 'work' ? Briefcase : FolderPlus,
+                })),
+                ...(!panels.some(p => p.id === 'exam' || p.templateId === 'exam') ? [{ id: 'exam', label: '考研备考', icon: GraduationCap }] : []),
+                ...(!panels.some(p => p.id === 'art' || p.templateId === 'art') ? [{ id: 'art', label: '绘画创作', icon: Palette }] : []),
               ].map(cat => {
                 const Icon = cat.icon;
                 const isSelected = targetTab === cat.id;
@@ -421,10 +443,10 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
                     key={cat.id}
                     type="button"
                     onClick={() => {
-                      setTargetTab(cat.id as any);
+                      setTargetTab(cat.id);
                       nativeBridge.performHapticFeedback('light');
                     }}
-                    className={`py-2 rounded-squircle text-xs flex flex-col items-center justify-center space-y-0.5 border transition-all active:scale-95 ${
+                    className={`px-3 py-1.5 rounded-squircle text-xs flex items-center space-x-1.5 border transition-all active:scale-95 ${
                       isSelected
                         ? cat.id === 'emergency'
                           ? 'bg-rose-500 text-white font-bold border-rose-500 shadow-sm'
@@ -433,7 +455,7 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
-                    <span className="text-[10px]">{cat.label}</span>
+                    <span className="text-[11px]">{cat.label}</span>
                   </button>
                 );
               })}
@@ -443,10 +465,13 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
             <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-squircle bg-theme-accent/10 border border-theme-accent/25 text-theme-accent text-[11px] font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-theme-accent animate-pulse shrink-0" />
               <span className="truncate">
-                自动归档至：【{targetTab === 'exam' ? '考研' : targetTab === 'art' ? '绘画' : '工作'}】页面 · {
-                  targetTab === 'emergency' ? '🚨 突发事件快速处置栏' :
-                  targetTab === 'exam' ? (examType === 'daily' ? '☀️ 考研每日打卡' : '📚 专项科目备考') :
-                  targetTab === 'art' ? (artType === 'daily' ? '☀️ 绘画每日打卡' : '🎨 商单约稿排单') :
+                自动归档至：【{
+                  targetTab === 'emergency' ? '🚨 突发事件栏' :
+                  isExam ? (examType === 'daily' ? '考研 · 每日打卡' : '考研 · 专项备考') :
+                  isArt ? (artType === 'daily' ? '绘画 · 每日打卡' : '绘画 · 约稿排单') :
+                  (currentPanel ? currentPanel.name : '全部待办')
+                }】· {
+                  targetTab === 'emergency' ? '即时响应置顶' :
                   (workPeriod === 'daily' ? '☀️ 每日打卡' : workPeriod === 'weekly' ? '📅 本周重点' : '🌕 本月规划')
                 }
               </span>
@@ -522,10 +547,10 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
             </div>
           )}
 
-          {/* 针对工作的分栏 (日常 / 周常 / 月常) */}
-          {targetTab === 'work' && (
+          {/* 针对通用待办与普通面板的分栏 (日常 / 周常 / 月常) */}
+          {(targetTab === 'tasks' || targetTab === 'work' || (!isExam && !isArt && targetTab !== 'emergency')) && (
             <div className="p-2.5 bg-theme-card-subtle rounded-squircle border border-theme-border/60 space-y-1.5">
-              <span className="text-[11px] font-medium text-theme-text-secondary">工作分栏选项（自动进入对应栏目）:</span>
+              <span className="text-[11px] font-medium text-theme-text-secondary">周期与分栏选项:</span>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
                   { id: 'daily', label: '☀️ 每日打卡' },
@@ -554,7 +579,7 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
           )}
 
           {/* 针对考研的分栏 (每日打卡 / 科目备考) */}
-          {targetTab === 'exam' && (
+          {isExam && (
             <div className="p-2.5 bg-theme-card-subtle rounded-squircle border border-theme-border/60 space-y-2">
               <span className="text-[11px] font-medium text-theme-text-secondary">考研分栏选项（自动进入对应栏目）:</span>
               <div className="grid grid-cols-2 gap-1.5">
@@ -599,7 +624,7 @@ export const SmartAddTaskModal: React.FC<SmartAddTaskModalProps> = ({
           )}
 
           {/* 针对绘画的分栏 (每日练习 / 商单约稿) */}
-          {targetTab === 'art' && (
+          {isArt && (
             <div className="p-2.5 bg-theme-card-subtle rounded-squircle border border-theme-border/60 space-y-2">
               <span className="text-[11px] font-medium text-theme-text-secondary">绘画分栏选项（自动进入对应栏目）:</span>
               <div className="grid grid-cols-2 gap-1.5">
