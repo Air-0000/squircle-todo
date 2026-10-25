@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- WebView needs INTERNET to load https://appassets.androidplatform.net,
-         even though WebViewAssetLoader serves it from the APK. -->
+    <!-- Nothing in the app uses the network. INTERNET stays until it is confirmed on a
+         device that pages served by WebViewAssetLoader (https://appassets.androidplatform.net)
+         still load without it. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
 

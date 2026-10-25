@@ -11,13 +11,9 @@
     <script>
       (function() {
         try {
+          // Pre-paint defaults; MainActivity injects the real insets once the page loads.
           var top = 38;
           var bottom = 16;
-          if (window.AndroidBridge && window.AndroidBridge.getSafeAreaInsets) {
-            var insets = JSON.parse(window.AndroidBridge.getSafeAreaInsets());
-            if (insets.top > 0) top = Math.max(insets.top, 38);
-            if (insets.bottom > 0) bottom = Math.max(insets.bottom, 16);
-          }
           document.documentElement.style.setProperty('--safe-area-inset-top', top + 'px');
           document.documentElement.style.setProperty('--sat', top + 'px');
           document.documentElement.style.setProperty('--safe-area-inset-bottom', bottom + 'px');
