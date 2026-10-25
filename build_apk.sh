@@ -34,18 +34,30 @@ echo "======================================================================"
 # ------------------------------------------------------------------------------
 echo "==> [1/5] Configuring Toolchain Environment..."
 
-export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-amd64"
-export ANDROID_HOME="/home/constant/.wmtool/android-sdk"
-export ANDROID_SDK_ROOT="/home/constant/.wmtool/android-sdk"
-export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/home/constant/.wmtool/gradle-home}"
-GRADLE_BIN="/home/constant/.wmtool/gradle-8.7/bin/gradle"
+# Every location can be overridden from the environment (JAVA_HOME, ANDROID_HOME,
+# GRADLE_BIN, GRADLE_USER_HOME); the defaults are the original Linux dev box.
+LEGACY_TOOLS="/home/constant/.wmtool"
+if [ -z "${JAVA_HOME:-}" ] && [ -x /usr/libexec/java_home ]; then
+    JAVA_HOME="$(/usr/libexec/java_home 2>/dev/null || true)"
+fi
+export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}"
+export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$LEGACY_TOOLS/android-sdk}}"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+if [ -z "${GRADLE_USER_HOME:-}" ]; then
+    if [ -d "$LEGACY_TOOLS/gradle-home" ]; then GRADLE_USER_HOME="$LEGACY_TOOLS/gradle-home"; else GRADLE_USER_HOME="$HOME/.gradle"; fi
+fi
+export GRADLE_USER_HOME
+GRADLE_BIN="${GRADLE_BIN:-$LEGACY_TOOLS/gradle-8.7/bin/gradle}"
+if [ ! -x "$GRADLE_BIN" ] && command -v gradle >/dev/null 2>&1; then
+    GRADLE_BIN="$(command -v gradle)"
+fi
 
-# Prepend Gradle 8.7, Java 21, and Android SDK command line tools to PATH
-export PATH="/home/constant/.wmtool/gradle-8.7/bin:$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/34.0.0:$PATH"
+# Put Java and the Android SDK tools on PATH
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/34.0.0:$PATH"
 
 # Validate Java runtime
 if [ ! -x "$JAVA_HOME/bin/java" ]; then
-    echo "❌ Error: Java binary not found or not executable at $JAVA_HOME/bin/java" >&2
+    echo "❌ Error: Java not found at $JAVA_HOME/bin/java (set JAVA_HOME)" >&2
     exit 1
 fi
 echo "✓ Java Runtime:"
@@ -53,7 +65,7 @@ echo "✓ Java Runtime:"
 
 # Validate Gradle binary
 if [ ! -x "$GRADLE_BIN" ]; then
-    echo "❌ Error: Gradle 8.7 binary not found or not executable at $GRADLE_BIN" >&2
+    echo "❌ Error: Gradle not found at $GRADLE_BIN (set GRADLE_BIN or put gradle on PATH)" >&2
     exit 1
 fi
 echo "✓ Gradle Version:"
@@ -61,7 +73,7 @@ echo "✓ Gradle Version:"
 
 # Validate Android SDK
 if [ ! -d "$ANDROID_HOME/platforms/android-34" ]; then
-    echo "❌ Error: Android SDK Platform 34 not found at $ANDROID_HOME/platforms/android-34" >&2
+    echo "❌ Error: Android SDK Platform 34 not found at $ANDROID_HOME/platforms/android-34 (set ANDROID_HOME)" >&2
     exit 1
 fi
 echo "✓ Android SDK 34 verified at $ANDROID_HOME"
@@ -125,7 +137,7 @@ echo "✓ Synchronized $(find "$ASSETS_DIR" -type f | wc -l) asset files to $ASS
 # 4. Compile Android Debug APK with Gradle 8.7
 # ------------------------------------------------------------------------------
 echo ""
-echo "==> [4/5] Compiling Android APK with Gradle 8.7 (assembleDebug)..."
+echo "==> [4/5] Compiling Android APK with Gradle (assembleDebug)..."
 cd "$PROJECT_ROOT/android"
 
 if [ ! -f "build.gradle" ]; then
@@ -177,7 +189,7 @@ if [ ! -s "$DEST_OUT_APK" ]; then
 fi
 
 # Size sanity threshold validation (minimum 500KB expected for valid Android APK)
-APK_SIZE_BYTES=$(stat -c%s "$DEST_ROOT_APK")
+APK_SIZE_BYTES=$(wc -c < "$DEST_ROOT_APK" | tr -d ' ')
 APK_SIZE_HUMAN=$(du -h "$DEST_ROOT_APK" | cut -f1)
 
 if [ "$APK_SIZE_BYTES" -lt 500000 ]; then
@@ -205,7 +217,11 @@ if command -v apksigner >/dev/null 2>&1; then
     echo "✓ APK digital signature verified successfully."
 fi
 
-SHA256_HASH=$(sha256sum "$DEST_ROOT_APK" | awk '{print $1}')
+if command -v sha256sum >/dev/null 2>&1; then
+    SHA256_HASH=$(sha256sum "$DEST_ROOT_APK" | awk '{print $1}')
+else
+    SHA256_HASH=$(shasum -a 256 "$DEST_ROOT_APK" | awk '{print $1}')
+fi
 
 echo ""
 echo "======================================================================"
