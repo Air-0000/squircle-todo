@@ -34,18 +34,20 @@ export default {
           accent: withOpacity('--accent-primary'),
           'accent-secondary': withOpacity('--accent-secondary'),
           'accent-subtle': withOpacity('--accent-subtle'),
+          'accent-contrast': withOpacity('--accent-contrast'),
           border: withOpacity('--border-subtle'),
         }
       },
-      boxShadow: {
-        'squircle': 'var(--shadow-squircle)',
-        'squircle-sm': '0 2px 8px -2px rgba(0, 0, 0, 0.08)',
-        'squircle-lg': '0 12px 32px -6px rgba(0, 0, 0, 0.16)',
+      spacing: {
+        '4.5': '1.125rem',
+        '8.5': '2.125rem',
       },
-      transitionTimingFunction: {
-        'spring-smooth': 'cubic-bezier(0.175, 0.885, 0.32, 1.1)',
-        'spring-bouncy': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
-      }
+      boxShadow: {
+        '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+        'squircle': 'var(--shadow-squircle)',
+        'squircle-md': 'var(--shadow-squircle-md)',
+        'squircle-lg': 'var(--shadow-squircle-lg)',
+      },
     },
   },
   plugins: [],

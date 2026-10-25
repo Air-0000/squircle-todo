@@ -20,13 +20,6 @@
   --accent-subtle: rgba(255, 237, 213, 0.70);
   --accent-contrast: #292524;
   --border-subtle: rgba(255, 255, 255, 0.75);
-  --glass-card: rgba(255, 255, 255, 0.76);
-  --glass-card-subtle: rgba(245, 239, 235, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.75);
-  --glass-border-subtle: rgba(240, 234, 225, 0.60);
-  --glass-specular: rgba(255, 255, 255, 0.95);
-  --tag-pill-bg: rgba(255, 237, 213, 0.75);
-  --tag-pill-text: #C2410C;
   --shadow-squircle: 0 8px 30px -4px rgba(180, 140, 110, 0.14), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
   --shadow-squircle-md: 0 14px 38px -6px rgba(180, 140, 110, 0.18), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95);
   --shadow-squircle-lg: 0 20px 48px -8px rgba(180, 140, 110, 0.24), inset 0 1px 2px 0 rgba(255, 255, 255, 0.98);
@@ -46,13 +39,6 @@
   --accent-subtle: rgba(204, 251, 241, 0.70);
   --accent-contrast: #FFFFFF;
   --border-subtle: rgba(255, 255, 255, 0.80);
-  --glass-card: rgba(255, 255, 255, 0.78);
-  --glass-card-subtle: rgba(230, 245, 245, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.80);
-  --glass-border-subtle: rgba(204, 251, 241, 0.60);
-  --glass-specular: rgba(255, 255, 255, 0.95);
-  --tag-pill-bg: rgba(230, 255, 250, 0.75);
-  --tag-pill-text: #0F766E;
   --shadow-squircle: 0 8px 30px -4px rgba(13, 148, 136, 0.12), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
   --shadow-squircle-md: 0 14px 38px -6px rgba(13, 148, 136, 0.16), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95);
   --shadow-squircle-lg: 0 20px 48px -8px rgba(13, 148, 136, 0.22), inset 0 1px 2px 0 rgba(255, 255, 255, 0.98);
@@ -72,13 +58,6 @@
   --accent-subtle: rgba(69, 26, 3, 0.65);
   --accent-contrast: #1C1917;
   --border-subtle: rgba(255, 255, 255, 0.12);
-  --glass-card: rgba(38, 35, 32, 0.65);
-  --glass-card-subtle: rgba(51, 46, 42, 0.52);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-border-subtle: rgba(255, 255, 255, 0.08);
-  --glass-specular: rgba(255, 255, 255, 0.22);
-  --tag-pill-bg: rgba(69, 26, 3, 0.65);
-  --tag-pill-text: #FBBF24;
   --shadow-squircle: 0 12px 36px -4px rgba(0, 0, 0, 0.50), inset 0 1px 1px 0 rgba(255, 255, 255, 0.20);
   --shadow-squircle-md: 0 18px 46px -6px rgba(0, 0, 0, 0.65), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.25);
   --shadow-squircle-lg: 0 24px 56px -8px rgba(0, 0, 0, 0.78), inset 0 1px 2px 0 rgba(255, 255, 255, 0.30);
@@ -98,13 +77,6 @@
   --accent-subtle: rgba(8, 51, 68, 0.65);
   --accent-contrast: #0B0F19;
   --border-subtle: rgba(255, 255, 255, 0.14);
-  --glass-card: rgba(19, 28, 46, 0.65);
-  --glass-card-subtle: rgba(28, 39, 64, 0.52);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-border-subtle: rgba(255, 255, 255, 0.08);
-  --glass-specular: rgba(255, 255, 255, 0.25);
-  --tag-pill-bg: rgba(8, 51, 68, 0.65);
-  --tag-pill-text: #22D3EE;
   --shadow-squircle: 0 12px 36px -4px rgba(0, 0, 0, 0.55), inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
   --shadow-squircle-md: 0 18px 46px -6px rgba(0, 0, 0, 0.70), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.26);
   --shadow-squircle-lg: 0 24px 56px -8px rgba(0, 0, 0, 0.82), inset 0 1px 2px 0 rgba(255, 255, 255, 0.30);
@@ -113,8 +85,9 @@
 
 html, body {
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
   -webkit-tap-highlight-color: transparent;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -135,96 +108,17 @@ body {
   transform: translateZ(0);
 }
 
-/* Squircle relief elevation shadow classes */
-.shadow-squircle-md {
-  box-shadow: var(--shadow-squircle-md);
-}
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 
-.shadow-squircle-lg {
-  box-shadow: var(--shadow-squircle-lg);
+  /* Skip layout/paint for off-screen task rows in long lists. */
+  .task-item-containment {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 68px;
+  }
 }
-
-.text-theme-accent-contrast {
-  color: var(--accent-contrast);
-}
-
-.bg-theme-tag-pill {
-  background-color: var(--tag-pill-bg);
-}
-
-.text-theme-tag-pill {
-  color: var(--tag-pill-text);
-}
-
-/* Safe area insets utilities for Android notch / gesture nav bar */
-.pt-safe {
-  padding-top: max(var(--safe-area-inset-top, 0px), var(--sat, 0px), env(safe-area-inset-top, 0px), 38px);
-}
-.pb-safe {
-  padding-bottom: max(var(--safe-area-inset-bottom, 0px), var(--sab, 0px), env(safe-area-inset-bottom, 0px), 16px);
-}
-.pl-safe {
-  padding-left: max(var(--safe-area-inset-left, 0px), env(safe-area-inset-left, 0px), 0px);
-}
-.pr-safe {
-  padding-right: max(var(--safe-area-inset-right, 0px), env(safe-area-inset-right, 0px), 0px);
-}
-
-/* 120Hz Ultra-smooth scrolling and zero-lag touch response */
-html, body {
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
-  overscroll-behavior-y: none;
-}
-
-/* iOS 18 / visionOS 液态玻璃风格组件系统 (Liquid Glass System) */
-.ios-glass-card {
-  background: var(--glass-card);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-squircle);
-  transform: translateZ(0);
-}
-
-.ios-glass-card-subtle {
-  background: var(--glass-card-subtle);
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  border: 1px solid var(--glass-border-subtle);
-  transform: translateZ(0);
-}
-
-.ios-glass-dock {
-  background: var(--glass-card);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.35), inset 0 1px 1px 0 var(--glass-specular);
-  transform: translateZ(0);
-}
-
-.ios-glass-sheet {
-  background: var(--glass-card);
-  backdrop-filter: blur(32px) saturate(190%);
-  -webkit-backdrop-filter: blur(32px) saturate(190%);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.55), inset 0 1px 1.5px 0 var(--glass-specular);
-  transform: translateZ(0);
-}
-
-.ios-glass-pill {
-  background: var(--glass-card-subtle);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  border: 1px solid var(--glass-border-subtle);
-  box-shadow: inset 0 1px 0.5px 0 var(--glass-specular);
-  transform: translateZ(0);
-}
-
-/* 120Hz Fast Scrolling List Performance Containment */
-.task-item-containment {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 68px;
-}
-

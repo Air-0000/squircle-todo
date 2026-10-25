@@ -1,261 +1,170 @@
+/**
+ * Focus clock: pomodoro countdown, stopwatch and the focus history that feeds
+ * the achievements tab. Timers are anchored to wall-clock timestamps so they
+ * stay correct when the WebView throttles or suspends the 1s tick.
+ */
 import { create } from 'zustand';
-import { TodoItem } from '../types';
+import { createFocusRecord, type FocusMode, type FocusRecord } from '../domain/focus';
+import { persistSlice, readJSON, STORAGE_KEYS } from '../utils/storage';
 import { soundSynth } from '../utils/sound';
-import { nativeBridge } from '../utils/bridge';
-import { triggerMilestoneCelebration } from '../components/common/ConfettiBurst';
-import { useTaskStore } from './useTaskStore';
-import { useToastStore } from './useToastStore';
-import { useThemeStore } from './useThemeStore';
+import { haptic } from '../utils/bridge';
+import { celebrateMilestone } from '../utils/confetti';
+import { getTask, useTaskStore } from './useTaskStore';
+import { toast } from './useToastStore';
 
-export type FocusMode = 'clock' | 'pomodoro' | 'stopwatch';
-
-export interface FocusRecord {
-  id: string;
-  date: string; // YYYY-MM-DD
-  timestamp: string; // ISO
-  durationMinutes: number;
-  taskId?: string;
-  taskTitle?: string;
-  persona?: string;
-}
-
-export interface FocusStoreState {
-  // Modes & View state
+interface FocusState {
   mode: FocusMode;
-  isFullScreenOpen: boolean;
+  isOpen: boolean;
   isRunning: boolean;
-  
-  // Timer numerical values
-  pomodoroDurationMinutes: number; // 15, 25, 45, 60...
-  timeLeft: number; // in seconds
-  stopwatchElapsed: number; // in seconds
+  pomodoroMinutes: number;
+  /** Seconds left in the pomodoro. */
+  timeLeft: number;
+  /** Seconds on the stopwatch. */
+  elapsed: number;
+  linkedTaskId: string | null;
+  soundEnabled: boolean;
+  history: FocusRecord[];
 
-  // Task linking
-  linkedTask: TodoItem | null;
-
-  // Sound & ASMR
-  isSoundEnabled: boolean;
-  
-  // Persistent history
-  focusHistory: FocusRecord[];
-
-  // Actions
+  open: (options?: { mode?: FocusMode; taskId?: string | null; minutes?: number }) => void;
+  close: () => void;
   setMode: (mode: FocusMode) => void;
-  openFocusModal: (options?: { mode?: FocusMode; task?: TodoItem; durationMinutes?: number }) => void;
-  closeFocusModal: () => void;
-  startTimer: () => void;
-  pauseTimer: () => void;
-  resetTimer: () => void;
-  setPomodoroDuration: (minutes: number) => void;
-  linkTask: (task: TodoItem | null) => void;
+  start: () => void;
+  pause: () => void;
+  reset: () => void;
+  setPomodoroMinutes: (minutes: number) => void;
+  linkTask: (taskId: string | null) => void;
   toggleSound: () => void;
-  tick: () => void;
-  resetFocusData: () => void;
-  recordSession: (minutes: number, task?: TodoItem | null) => void;
+  tick: (now?: number) => void;
+  /** Logs a session (and credits the linked task). */
+  recordSession: (minutes: number) => void;
+  replaceHistory: (history: FocusRecord[]) => void;
+  clearHistory: () => void;
 }
 
-const STORAGE_KEY = 'squircle_focus_data_v1';
+// Wall-clock anchors for the running timer; not part of rendered state.
+let pomodoroDeadline = 0;
+let stopwatchStartedAt = 0;
+let stopwatchBase = 0;
 
-function loadStoredHistory(): FocusRecord[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.focusHistory)) {
-        return parsed.focusHistory;
-      }
-    }
-  } catch {}
-  
-  // Return clean empty array without pre-stored fake records
-  return [];
+function loadHistory(): FocusRecord[] {
+  const stored = readJSON<{ focusHistory?: FocusRecord[] }>(STORAGE_KEYS.focus);
+  return Array.isArray(stored?.focusHistory) ? stored.focusHistory : [];
 }
 
-function persistHistory(records: FocusRecord[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ focusHistory: records }));
-  } catch {}
-}
+export const useFocusStore = create<FocusState>((set, get) => {
+  const anchor = (now = Date.now()) => {
+    const { timeLeft, elapsed } = get();
+    pomodoroDeadline = now + timeLeft * 1000;
+    stopwatchStartedAt = now;
+    stopwatchBase = elapsed;
+  };
+  const pop = () => {
+    if (get().soundEnabled) soundSynth.playDropletPop();
+  };
 
-export const useFocusStore = create<FocusStoreState>((set, get) => ({
-  mode: 'clock',
-  isFullScreenOpen: false,
-  isRunning: false,
-  pomodoroDurationMinutes: 25,
-  timeLeft: 25 * 60,
-  stopwatchElapsed: 0,
-  linkedTask: null,
-  isSoundEnabled: true,
-  focusHistory: loadStoredHistory(),
+  const completePomodoro = () => {
+    const minutes = get().pomodoroMinutes;
+    set({ isRunning: false, timeLeft: minutes * 60 });
+    if (get().soundEnabled) soundSynth.playBellChime();
+    haptic('success');
+    celebrateMilestone();
+    get().recordSession(minutes);
+    toast.success(`🎉 太棒了！已深度专注 ${minutes} 分钟！休息 5 分钟吧 ☕`);
+  };
 
-  setMode: (mode) => {
-    const { isRunning, pomodoroDurationMinutes } = get();
-    if (!isRunning) {
-      if (mode === 'pomodoro') {
-        set({ mode, timeLeft: pomodoroDurationMinutes * 60 });
+  return {
+    mode: 'clock',
+    isOpen: false,
+    isRunning: false,
+    pomodoroMinutes: 25,
+    timeLeft: 25 * 60,
+    elapsed: 0,
+    linkedTaskId: null,
+    soundEnabled: true,
+    history: loadHistory(),
+
+    open: options => {
+      const { isRunning, timeLeft, pomodoroMinutes, mode, linkedTaskId } = get();
+      const minutes = options?.minutes ?? pomodoroMinutes;
+      set({
+        isOpen: true,
+        mode: options?.mode ?? mode,
+        linkedTaskId: options?.taskId !== undefined ? options.taskId : linkedTaskId,
+        pomodoroMinutes: minutes,
+        timeLeft: isRunning ? timeLeft : minutes * 60,
+      });
+      haptic('medium');
+    },
+    close: () => set({ isOpen: false }),
+
+    setMode: mode => {
+      if (get().isRunning) {
+        anchor();
+        set({ mode });
+      } else if (mode === 'pomodoro') {
+        set({ mode, timeLeft: get().pomodoroMinutes * 60 });
       } else if (mode === 'stopwatch') {
-        set({ mode, stopwatchElapsed: 0 });
+        set({ mode, elapsed: 0 });
       } else {
         set({ mode });
       }
-    } else {
-      set({ mode });
-    }
-    nativeBridge.performHapticFeedback('light');
-  },
+      haptic('light');
+    },
 
-  openFocusModal: (options) => {
-    const state = get();
-    const targetMode = options?.mode || state.mode || 'clock';
-    const duration = options?.durationMinutes || state.pomodoroDurationMinutes || 25;
-    const task = options?.task !== undefined ? options.task : state.linkedTask;
+    start: () => {
+      pop();
+      haptic('medium');
+      anchor();
+      set({ isRunning: true });
+    },
+    pause: () => {
+      pop();
+      haptic('light');
+      get().tick();
+      set({ isRunning: false });
+    },
+    reset: () => {
+      pop();
+      haptic('light');
+      set({ isRunning: false, timeLeft: get().pomodoroMinutes * 60, elapsed: 0 });
+    },
+    setPomodoroMinutes: minutes => {
+      set({ pomodoroMinutes: minutes, timeLeft: minutes * 60, isRunning: false });
+      haptic('light');
+    },
+    linkTask: linkedTaskId => set({ linkedTaskId }),
+    toggleSound: () => {
+      set({ soundEnabled: !get().soundEnabled });
+      pop();
+    },
 
-    set({
-      isFullScreenOpen: true,
-      mode: targetMode,
-      linkedTask: task,
-      pomodoroDurationMinutes: duration,
-      timeLeft: state.isRunning ? state.timeLeft : duration * 60,
-    });
-    nativeBridge.performHapticFeedback('medium');
-  },
-
-  closeFocusModal: () => {
-    set({ isFullScreenOpen: false });
-    nativeBridge.performHapticFeedback('light');
-  },
-
-  startTimer: () => {
-    const { isSoundEnabled } = get();
-    if (isSoundEnabled) soundSynth.playDropletPop();
-    nativeBridge.performHapticFeedback('medium');
-    set({ isRunning: true });
-  },
-
-  pauseTimer: () => {
-    const { isSoundEnabled } = get();
-    if (isSoundEnabled) soundSynth.playDropletPop();
-    nativeBridge.performHapticFeedback('light');
-    set({ isRunning: false });
-  },
-
-  resetTimer: () => {
-    const { pomodoroDurationMinutes, isSoundEnabled } = get();
-    if (isSoundEnabled) soundSynth.playDropletPop();
-    nativeBridge.performHapticFeedback('light');
-    set({
-      isRunning: false,
-      timeLeft: pomodoroDurationMinutes * 60,
-      stopwatchElapsed: 0,
-    });
-  },
-
-  setPomodoroDuration: (minutes) => {
-    set({
-      pomodoroDurationMinutes: minutes,
-      timeLeft: minutes * 60,
-      isRunning: false,
-    });
-    nativeBridge.performHapticFeedback('light');
-  },
-
-  linkTask: (task) => {
-    set({ linkedTask: task });
-    nativeBridge.performHapticFeedback('light');
-  },
-
-  toggleSound: () => {
-    const next = !get().isSoundEnabled;
-    set({ isSoundEnabled: next });
-    if (next) soundSynth.playDropletPop();
-    nativeBridge.performHapticFeedback('light');
-  },
-
-  recordSession: (minutes, task) => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const newRecord: FocusRecord = {
-      id: `focus-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      date: todayStr,
-      timestamp: new Date().toISOString(),
-      durationMinutes: minutes,
-      taskId: task?.id,
-      taskTitle: task?.title,
-      persona: task?.persona || 'general',
-    };
-
-    const updated = [newRecord, ...get().focusHistory];
-    set({ focusHistory: updated });
-    persistHistory(updated);
-
-    // If linked to an existing task in useTaskStore, accumulate focus minutes and pomodoros
-    if (task?.id) {
-      const taskStore = useTaskStore.getState();
-      const currentTask = taskStore.getTask(task.id);
-      if (currentTask) {
-        const prevExamData = (currentTask.examData || {}) as any;
-        const newTotal = (prevExamData.focusTimeTotalMinutes || 0) + minutes;
-        const newCount = (prevExamData.pomodoroCount || 0) + 1;
-        taskStore.updateTask(task.id, {
-          examData: {
-            subject: prevExamData.subject || 'general',
-            ...prevExamData,
-            focusTimeTotalMinutes: newTotal,
-            pomodoroCount: newCount,
-          },
-          personaData: {
-            ...(currentTask.personaData || {}),
-            focusTimeTotalMinutes: newTotal,
-            pomodoroCount: newCount,
-          },
-        });
+    tick: (now = Date.now()) => {
+      const { isRunning, mode, timeLeft, elapsed } = get();
+      if (!isRunning) return;
+      if (mode === 'pomodoro') {
+        const left = Math.max(0, Math.ceil((pomodoroDeadline - now) / 1000));
+        if (left === 0) completePomodoro();
+        else if (left !== timeLeft) set({ timeLeft: left });
+      } else if (mode === 'stopwatch') {
+        const next = stopwatchBase + Math.floor((now - stopwatchStartedAt) / 1000);
+        if (next !== elapsed) set({ elapsed: next });
       }
-    }
-  },
+    },
 
-  tick: () => {
-    const state = get();
-    if (!state.isRunning) return;
+    recordSession: minutes => {
+      const task = get().linkedTaskId ? getTask(get().linkedTaskId!) ?? null : null;
+      set({ history: [createFocusRecord(minutes, task), ...get().history] });
+      if (task) useTaskStore.getState().addFocusMinutes(task.id, minutes);
+    },
+    replaceHistory: history => set({ history }),
+    clearHistory: () => set({ history: [], isRunning: false, timeLeft: get().pomodoroMinutes * 60, elapsed: 0, linkedTaskId: null }),
+  };
+});
 
-    if (state.mode === 'pomodoro') {
-      if (state.timeLeft <= 1) {
-        // Pomodoro Completed!
-        const duration = state.pomodoroDurationMinutes;
-        set({
-          isRunning: false,
-          timeLeft: duration * 60,
-        });
+persistSlice(useFocusStore, STORAGE_KEYS.focus, s => s.history, history => ({ focusHistory: history }));
 
-        // Play chime & celebrate
-        if (state.isSoundEnabled) soundSynth.playBellChime();
-        nativeBridge.performHapticFeedback('success');
-        triggerMilestoneCelebration(useThemeStore.getState().theme);
-
-        // Record session
-        state.recordSession(duration, state.linkedTask);
-
-        // Notify user with toast
-        useToastStore.getState().showToast(
-          `🎉 太棒了！已深度专注 ${duration} 分钟！休息 5 分钟吧 ☕`,
-          'success'
-        );
-      } else {
-        set({ timeLeft: state.timeLeft - 1 });
-      }
-    } else if (state.mode === 'stopwatch') {
-      set({ stopwatchElapsed: state.stopwatchElapsed + 1 });
-    }
-  },
-
-  resetFocusData: () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-    set({
-      focusHistory: [],
-      isRunning: false,
-      timeLeft: get().pomodoroDurationMinutes * 60,
-      stopwatchElapsed: 0,
-      linkedTask: null,
-    });
-  },
-}));
+/** The linked task, resolved live from the task store. */
+export const useLinkedTask = () => {
+  const id = useFocusStore(s => s.linkedTaskId);
+  return useTaskStore(s => (id ? s.tasks.find(t => t.id === id) ?? null : null));
+};

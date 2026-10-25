@@ -1,104 +1,75 @@
-import React, { useState, useMemo } from 'react';
-import { Clock, Edit3, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import { SquircleCard } from '../../common/SquircleCard';
-import { nativeBridge } from '../../../utils/bridge';
+import React, { useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Clock, Edit3 } from 'lucide-react';
+import { daysBetween, parseDateKey } from '../../../domain/dates';
+import { usePanelStore } from '../../../stores/usePanelStore';
 import { toast } from '../../../stores/useToastStore';
+import { haptic } from '../../../utils/bridge';
+import { ModuleCard } from '../../ui/ModuleCard';
+import type { ModuleProps } from './types';
 
-interface CountdownModuleProps {
-  title?: string;
-  targetDate?: string;
-  onUpdateTargetDate?: (newDate: string) => void;
-}
+const DEFAULT_TARGET = '2026-12-26';
 
-export const CountdownModule: React.FC<CountdownModuleProps> = ({
-  title = '目标里程碑倒计时',
-  targetDate = '2026-12-26',
-  onUpdateTargetDate,
-}) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [dateInput, setDateInput] = useState(targetDate);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export const CountdownModule: React.FC<ModuleProps> = ({ panel }) => {
+  const updatePanel = usePanelStore(s => s.updatePanel);
+  const target = panel.countdownTargetDate || DEFAULT_TARGET;
+  const [editing, setEditing] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [dateInput, setDateInput] = useState(target);
 
-  const daysRemaining = useMemo(() => {
-    const now = new Date();
-    const target = new Date(targetDate);
-    const diffMs = target.getTime() - now.getTime();
-    return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-  }, [targetDate]);
+  const daysLeft = Math.max(0, daysBetween(new Date(), parseDateKey(target)));
 
-  const handleSaveDate = (e: React.FormEvent) => {
+  const save = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dateInput) return;
-    if (onUpdateTargetDate) {
-      onUpdateTargetDate(dateInput);
-    }
-    setIsEditing(false);
-    nativeBridge.performHapticFeedback('light');
+    updatePanel(panel.id, { countdownTargetDate: dateInput });
+    setEditing(false);
+    haptic('light');
     toast.success(`目标日期已更新为 ${dateInput}`);
   };
 
+  const iconButton = 'p-1.5 rounded-squircle hover:bg-theme-card-subtle text-theme-text-secondary hover:text-theme-text transition-colors';
+
   return (
-    <SquircleCard elevation={2} radius="lg" className="p-4 bg-theme-card border border-theme-border shadow-squircle relative overflow-hidden group">
-      {/* Background soft ambient glow */}
-      <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-theme-accent/10 blur-2xl pointer-events-none" />
-
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-squircle bg-theme-accent/15 border border-theme-accent/25 flex items-center justify-center text-theme-accent shrink-0">
-            <Clock className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-theme-text">{title}</h3>
-            <p className="text-[10px] text-theme-text-muted mt-0.5">目标节点: {targetDate}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-1">
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="p-1.5 rounded-squircle hover:bg-theme-card-subtle text-theme-text-secondary hover:text-theme-text transition-colors"
-            title="修改目标日期"
-          >
+    <ModuleCard
+      icon={Clock}
+      title={panel.countdownTitle || `${panel.name} 倒计时`}
+      subtitle={`目标节点: ${target}`}
+      actions={
+        <>
+          <button onClick={() => setEditing(v => !v)} className={iconButton} title="修改目标日期">
             <Edit3 className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-squircle hover:bg-theme-card-subtle text-theme-text-secondary hover:text-theme-text transition-colors"
-          >
-            {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+          <button onClick={() => setCollapsed(v => !v)} className={iconButton} aria-label={collapsed ? '展开' : '收起'}>
+            {collapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
           </button>
-        </div>
-      </div>
-
-      {isEditing && (
-        <form onSubmit={handleSaveDate} className="mb-3 p-2.5 rounded-squircle bg-theme-card-subtle border border-theme-border flex items-center space-x-2">
+        </>
+      }
+    >
+      {editing && (
+        <form onSubmit={save} className="p-2.5 rounded-squircle bg-theme-card-subtle border border-theme-border flex items-center gap-2">
           <input
             type="date"
             value={dateInput}
             onChange={e => setDateInput(e.target.value)}
             className="flex-1 bg-theme-card px-2.5 py-1.5 rounded-squircle border border-theme-border text-xs text-theme-text focus:outline-none focus:border-theme-accent font-mono"
           />
-          <button
-            type="submit"
-            className="px-3 py-1.5 rounded-squircle bg-theme-accent text-theme-accent-contrast text-xs font-bold flex items-center space-x-1"
-          >
+          <button type="submit" className="px-3 py-1.5 rounded-squircle bg-theme-accent text-theme-accent-contrast text-xs font-bold flex items-center gap-1">
             <Check className="w-3.5 h-3.5" />
             <span>保存</span>
           </button>
         </form>
       )}
-
-      {!isCollapsed && (
-        <div className="flex items-baseline justify-between pt-1">
+      {!collapsed && (
+        <div className="flex items-baseline justify-between">
           <div>
-            <span className="text-3xl font-black text-theme-accent font-mono tracking-tight">{daysRemaining}</span>
+            <span className="text-3xl font-black text-theme-accent font-mono tracking-tight">{daysLeft}</span>
             <span className="text-xs font-bold text-theme-text ml-1.5">天</span>
           </div>
           <span className="text-[11px] text-theme-text-secondary">
-            {daysRemaining === 0 ? '🎉 目标日已到达！' : `距离目标还有 ${daysRemaining} 天，保持专注节奏`}
+            {daysLeft === 0 ? '🎉 目标日已到达！' : `距离目标还有 ${daysLeft} 天，保持专注节奏`}
           </span>
         </div>
       )}
-    </SquircleCard>
+    </ModuleCard>
   );
 };

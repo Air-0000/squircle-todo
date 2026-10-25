@@ -1,68 +1,76 @@
 /**
- * Synchronous LocalStorage Persistence Snapshot Engine
- * Provides instant 0ms cold start data access without UI flash or layout shift.
+ * localStorage access for the stores. Every key the app writes is listed in
+ * STORAGE_KEYS so "clear all data" can't miss one.
  */
+import type { StoreApi } from 'zustand';
 
-import { StoragePayload, TodoItem } from '../types';
-import { migrateStoragePayload, CURRENT_SCHEMA_VERSION } from './migration';
+export const STORAGE_KEYS = {
+  tasks: 'squircle_todo_data_v2',
+  theme: 'squircle_theme_state_v1',
+  panels: 'squircle_custom_panels_v2',
+  focus: 'squircle_focus_data_v1',
+  bulletinsRead: 'squircle_read_bulletins_v1',
+  bulletinsCache: 'squircle_bulletins_cache_v1',
+  feedback: 'squircle_user_feedbacks_v1',
+} as const;
 
-export const STORAGE_KEY = 'squircle_todo_data_v2';
+/** Written by v1.x builds only; removed on reset. */
+const LEGACY_KEYS = ['squircle_user_settings_v1'];
 
-export function loadLocalStorageSnapshot(): StoragePayload {
-  const fallback: StoragePayload = {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    updatedAt: new Date().toISOString(),
-    tasks: [],
-  };
-
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return fallback;
-  }
-
+function storage(): Storage | null {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
-
-    const parsed = JSON.parse(raw);
-    const { payload, migrated } = migrateStoragePayload(parsed);
-
-    if (migrated) {
-      saveLocalStorageSnapshot(payload);
-    }
-    return payload;
-  } catch (err) {
-    console.warn('[Storage] Failed to read or parse LocalStorage snapshot:', err);
-    return fallback;
+    return typeof window !== 'undefined' ? window.localStorage : null;
+  } catch {
+    return null;
   }
 }
 
-export function saveLocalStorageSnapshot(payload: {
-  schemaVersion?: number;
-  updatedAt?: string;
-  tasks: TodoItem[];
-  themeState?: any;
-}): void {
-  if (typeof window === 'undefined' || !window.localStorage) return;
-
+export function readJSON<T = unknown>(key: string): T | undefined {
+  const raw = storage()?.getItem(key);
+  if (!raw) return undefined;
   try {
-    const serialized = JSON.stringify({
-      schemaVersion: payload.schemaVersion || CURRENT_SCHEMA_VERSION,
-      updatedAt: payload.updatedAt || new Date().toISOString(),
-      tasks: payload.tasks,
-      themeState: payload.themeState,
-    });
-    window.localStorage.setItem(STORAGE_KEY, serialized);
+    return JSON.parse(raw) as T;
   } catch (err) {
-    console.warn('[Storage] LocalStorage quota exceeded or write failed:', err);
+    console.warn(`[storage] Ignoring unreadable value for "${key}"`, err);
+    return undefined;
   }
 }
 
-export function clearLocalStorage(): void {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch (err) {
-      console.warn('[Storage] Failed to remove LocalStorage key:', err);
-    }
+export function writeJSON(key: string, value: unknown): void {
+  try {
+    storage()?.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.warn(`[storage] Failed to write "${key}" (quota?)`, err);
   }
+}
+
+export function removeKey(key: string): void {
+  try {
+    storage()?.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearAllAppData(): void {
+  [...Object.values(STORAGE_KEYS), ...LEGACY_KEYS].forEach(removeKey);
+}
+
+/**
+ * Writes `serialize(state)` to `key` whenever the selected slice changes
+ * (compared by reference), so actions never have to remember to save.
+ */
+export function persistSlice<S, T>(
+  store: StoreApi<S>,
+  key: string,
+  select: (state: S) => T,
+  serialize: (slice: T) => unknown = slice => slice,
+): void {
+  let previous = select(store.getState());
+  store.subscribe(state => {
+    const next = select(state);
+    if (next === previous) return;
+    previous = next;
+    writeJSON(key, serialize(next));
+  });
 }

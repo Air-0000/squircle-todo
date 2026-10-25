@@ -6,11 +6,9 @@ export interface ToastMessage {
   id: string;
   message: string;
   type: ToastType;
-  duration?: number;
 }
 
-export interface ConfirmDialogConfig {
-  isOpen: boolean;
+export interface ConfirmOptions {
   title: string;
   message: string;
   confirmText?: string;
@@ -20,71 +18,39 @@ export interface ConfirmDialogConfig {
   onCancel?: () => void;
 }
 
-interface ToastStore {
+interface ToastState {
   toasts: ToastMessage[];
-  confirmDialog: ConfirmDialogConfig | null;
-
-  showToast: (message: string, type?: ToastType, duration?: number) => void;
+  confirmDialog: ConfirmOptions | null;
+  showToast: (message: string, type?: ToastType, durationMs?: number) => void;
   removeToast: (id: string) => void;
-  showConfirm: (config: Omit<ConfirmDialogConfig, 'isOpen'>) => void;
+  showConfirm: (options: ConfirmOptions) => void;
   closeConfirm: () => void;
 }
 
-export const useToastStore = create<ToastStore>((set) => ({
+const MAX_VISIBLE = 3;
+
+export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   confirmDialog: null,
 
-  showToast: (message, type = 'info', duration = 2500) => {
-    const id = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const newToast: ToastMessage = { id, message, type, duration };
-
-    set((state) => ({
-      toasts: [...state.toasts.slice(-2), newToast], // Keep at most 3 toasts on screen
-    }));
-
-    if (duration > 0) {
-      setTimeout(() => {
-        set((state) => ({
-          toasts: state.toasts.filter((t) => t.id !== id),
-        }));
-      }, duration);
-    }
+  showToast: (message, type = 'info', durationMs = 2500) => {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    set(state => ({ toasts: [...state.toasts.slice(-(MAX_VISIBLE - 1)), { id, message, type }] }));
+    if (durationMs > 0) setTimeout(() => get().removeToast(id), durationMs);
   },
-
-  removeToast: (id) => {
-    set((state) => ({
-      toasts: state.toasts.filter((t) => t.id !== id),
-    }));
-  },
-
-  showConfirm: (config) => {
-    set({
-      confirmDialog: {
-        ...config,
-        isOpen: true,
-      },
-    });
-  },
-
-  closeConfirm: () => {
-    set({ confirmDialog: null });
-  },
+  removeToast: id => set(state => ({ toasts: state.toasts.filter(t => t.id !== id) })),
+  showConfirm: confirmDialog => set({ confirmDialog }),
+  closeConfirm: () => set({ confirmDialog: null }),
 }));
 
-// Convenience helper methods
+const show = (type: ToastType) => (message: string, durationMs?: number) =>
+  useToastStore.getState().showToast(message, type, durationMs);
+
 export const toast = {
-  show: (message: string, type?: ToastType, duration?: number) =>
-    useToastStore.getState().showToast(message, type, duration),
-  success: (message: string, duration?: number) =>
-    useToastStore.getState().showToast(message, 'success', duration),
-  info: (message: string, duration?: number) =>
-    useToastStore.getState().showToast(message, 'info', duration),
-  warning: (message: string, duration?: number) =>
-    useToastStore.getState().showToast(message, 'warning', duration),
-  error: (message: string, duration?: number) =>
-    useToastStore.getState().showToast(message, 'error', duration),
-  cycleReset: (message: string, duration?: number) =>
-    useToastStore.getState().showToast(message, 'cycle_reset', duration),
-  confirm: (config: Omit<ConfirmDialogConfig, 'isOpen'>) =>
-    useToastStore.getState().showConfirm(config),
+  success: show('success'),
+  info: show('info'),
+  warning: show('warning'),
+  error: show('error'),
+  cycleReset: show('cycle_reset'),
+  confirm: (options: ConfirmOptions) => useToastStore.getState().showConfirm(options),
 };
