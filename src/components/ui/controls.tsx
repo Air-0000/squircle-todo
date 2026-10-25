@@ -1,17 +1,17 @@
-/** Small building blocks shared by tabs, modules and modals. */
+/** Native-style controls shared by tabs, modules and sheets. */
 import React, { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import { haptic } from '../../utils/bridge';
 
 // ---------------------------------------------------------------------------
-// SegmentedControl — the pill tab strip used all over the app
+// SegmentedControl
 // ---------------------------------------------------------------------------
 
 export interface Segment<T extends string> {
   value: T;
   label: React.ReactNode;
   icon?: React.ComponentType<{ className?: string }>;
-  /** Active styling override (e.g. red for "overdue"). */
+  /** Text colour of the selected segment (e.g. red for "overdue"). */
   activeClassName?: string;
 }
 
@@ -19,9 +19,10 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   options: Segment<T>[];
-  size?: 'xs' | 'sm';
-  /** 'track' renders inside a rounded track; 'chips' renders free-floating, scrollable chips. */
+  size?: 'sm' | 'md';
+  /** 'track': iOS segmented control. 'chips': scrollable filter chips. */
   appearance?: 'track' | 'chips';
+  /** Track only: segments share the full width. */
   stretch?: boolean;
   className?: string;
 }
@@ -30,19 +31,45 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   options,
-  size = 'sm',
+  size = 'md',
   appearance = 'track',
-  stretch = false,
+  stretch = true,
   className = '',
 }: SegmentedControlProps<T>) {
-  const text = size === 'xs' ? 'text-[10px] px-2 py-0.5' : 'text-[11px] px-2.5 py-1';
-  const container =
-    appearance === 'track'
-      ? 'flex items-center gap-1 bg-theme-card-subtle p-0.5 rounded-full border border-theme-border/60'
-      : 'flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5';
+  const select = (v: T) => {
+    if (v !== value) haptic('light');
+    onChange(v);
+  };
+
+  if (appearance === 'chips') {
+    return (
+      <div className={`flex items-center gap-2 overflow-x-auto no-scrollbar ${className}`} role="tablist">
+        {options.map(opt => {
+          const active = opt.value === value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => select(opt.value)}
+              className={`h-8 px-3.5 rounded-full text-footnote font-medium whitespace-nowrap transition-colors shrink-0 ${
+                active ? 'bg-theme-accent text-theme-accent-contrast' : 'bg-theme-card-subtle text-theme-text'
+              }`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
-    <div className={`${container} ${className}`} role="tablist">
+    <div
+      className={`${stretch ? 'flex' : 'inline-flex'} items-stretch p-0.5 rounded-[10px] bg-theme-card-subtle ${size === 'sm' ? 'h-7' : 'h-8'} ${className}`}
+      role="tablist"
+    >
       {options.map(opt => {
         const active = opt.value === value;
         const Icon = opt.icon;
@@ -52,18 +79,13 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="tab"
             aria-selected={active}
-            onClick={() => {
-              if (!active) haptic('light');
-              onChange(opt.value);
-            }}
-            className={`${text} rounded-full font-semibold whitespace-nowrap transition-all flex items-center justify-center gap-1 ${
-              stretch ? 'flex-1' : ''
+            onClick={() => select(opt.value)}
+            className={`${stretch ? 'flex-1' : ''} px-3 rounded-[8px] whitespace-nowrap flex items-center justify-center gap-1 transition-all ${
+              size === 'sm' ? 'text-caption' : 'text-footnote'
             } ${
               active
-                ? opt.activeClassName ?? 'bg-theme-accent text-theme-accent-contrast shadow-2xs'
-                : appearance === 'chips'
-                  ? 'bg-theme-card-subtle text-theme-text-secondary hover:text-theme-text'
-                  : 'text-theme-text-secondary hover:text-theme-text'
+                ? `bg-theme-card dark:bg-white/[0.16] shadow-2xs font-semibold ${opt.activeClassName ?? 'text-theme-text'}`
+                : 'text-theme-text-secondary font-medium'
             }`}
           >
             {Icon && <Icon className="w-3.5 h-3.5" />}
@@ -76,31 +98,21 @@ export function SegmentedControl<T extends string>({
 }
 
 // ---------------------------------------------------------------------------
-// CheckButton — round/squircle completion toggle
+// CheckButton — circular completion toggle (Reminders-style)
 // ---------------------------------------------------------------------------
 
 interface CheckButtonProps {
   checked: boolean;
   onToggle: () => void;
   size?: 'sm' | 'md';
-  shape?: 'round' | 'squircle';
-  tone?: 'accent' | 'success';
+  tone?: 'accent' | 'danger';
   label?: string;
 }
 
-export const CheckButton: React.FC<CheckButtonProps> = ({
-  checked,
-  onToggle,
-  size = 'md',
-  shape = 'squircle',
-  tone = 'accent',
-  label,
-}) => {
-  const box = size === 'sm' ? 'w-4.5 h-4.5' : 'w-5 h-5';
-  const on =
-    tone === 'success'
-      ? 'bg-emerald-500 border-emerald-500 text-white'
-      : 'bg-theme-accent border-theme-accent text-theme-accent-contrast shadow-sm';
+export const CheckButton: React.FC<CheckButtonProps> = ({ checked, onToggle, size = 'md', tone = 'accent', label }) => {
+  const box = size === 'sm' ? 'w-5 h-5' : 'w-[22px] h-[22px]';
+  const on = tone === 'danger' ? 'bg-rose-500 border-rose-500 text-white' : 'bg-theme-accent border-theme-accent text-theme-accent-contrast';
+  const off = tone === 'danger' ? 'border-rose-400' : 'border-theme-text-muted';
   return (
     <button
       type="button"
@@ -110,11 +122,12 @@ export const CheckButton: React.FC<CheckButtonProps> = ({
         e.stopPropagation();
         onToggle();
       }}
-      className={`${box} ${shape === 'round' ? 'rounded-full' : 'rounded-squircle-sm'} border flex items-center justify-center shrink-0 transition-colors ${
-        checked ? on : 'border-theme-border hover:border-theme-accent bg-theme-card-subtle'
-      }`}
+      // Larger hit area than the visible circle.
+      className="-m-2 p-2 shrink-0"
     >
-      {checked && <Check className={`${size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} stroke-[3]`} />}
+      <span className={`${box} rounded-full border-[1.5px] flex items-center justify-center transition-colors ${checked ? on : off}`}>
+        {checked && <Check className={`${size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5'} stroke-[3]`} />}
+      </span>
     </button>
   );
 };
@@ -123,12 +136,8 @@ export const CheckButton: React.FC<CheckButtonProps> = ({
 // ProgressBar
 // ---------------------------------------------------------------------------
 
-export const ProgressBar: React.FC<{ ratio: number; height?: string; className?: string }> = ({
-  ratio,
-  height = 'h-1',
-  className = '',
-}) => (
-  <div className={`w-full ${height} bg-theme-border/60 rounded-full overflow-hidden ${className}`}>
+export const ProgressBar: React.FC<{ ratio: number; height?: string; className?: string }> = ({ ratio, height = 'h-1', className = '' }) => (
+  <div className={`w-full ${height} bg-theme-card-subtle rounded-full overflow-hidden ${className}`}>
     <div
       className={`h-full rounded-full transition-all duration-300 ${ratio >= 1 ? 'bg-emerald-500' : 'bg-theme-accent'}`}
       style={{ width: `${Math.round(Math.min(1, Math.max(0, ratio)) * 100)}%` }}
@@ -137,7 +146,7 @@ export const ProgressBar: React.FC<{ ratio: number; height?: string; className?:
 );
 
 // ---------------------------------------------------------------------------
-// QuickAddForm — single-line input + 添加 button
+// QuickAddForm — "+ 新建…" input row
 // ---------------------------------------------------------------------------
 
 interface QuickAddFormProps {
@@ -145,38 +154,63 @@ interface QuickAddFormProps {
   onSubmit: (text: string) => void;
   buttonLabel?: string;
   tone?: 'accent' | 'danger';
+  /** 'row' sits inside a list card; 'field' is a standalone rounded field. */
+  variant?: 'row' | 'field';
 }
 
-export const QuickAddForm: React.FC<QuickAddFormProps> = ({ placeholder, onSubmit, buttonLabel = '添加', tone = 'accent' }) => {
+export const QuickAddForm: React.FC<QuickAddFormProps> = ({ placeholder, onSubmit, buttonLabel = '添加', tone = 'accent', variant = 'field' }) => {
   const [text, setText] = useState('');
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Not a <form>: this often sits inside another form (the add-task sheet).
+  const submit = () => {
     const value = text.trim();
     if (!value) return;
     onSubmit(value);
     setText('');
   };
-  return (
-    <form onSubmit={submit} className="flex items-center gap-2">
+  const color = tone === 'danger' ? 'text-rose-500' : 'text-theme-accent';
+  const field = (
+    <>
       <input
         type="text"
         value={text}
         onChange={e => setText(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            submit();
+          }
+        }}
         placeholder={placeholder}
-        className={`flex-1 min-w-0 bg-theme-card-subtle px-3 py-2 rounded-squircle border text-xs text-theme-text placeholder:text-theme-text-muted focus:outline-none ${
-          tone === 'danger' ? 'border-rose-500/30 focus:border-rose-500' : 'border-theme-border focus:border-theme-accent'
-        }`}
+        enterKeyHint="done"
+        className="flex-1 min-w-0 bg-transparent text-body text-theme-text placeholder:text-theme-text-muted outline-none"
       />
-      <button
-        type="submit"
-        disabled={!text.trim()}
-        className={`py-2 px-3.5 rounded-squircle text-xs font-bold shadow-squircle active:scale-95 disabled:opacity-50 shrink-0 ${
-          tone === 'danger' ? 'bg-rose-500 text-white' : 'bg-theme-accent text-theme-accent-contrast'
-        }`}
-      >
-        {buttonLabel}
-      </button>
-    </form>
+      {text.trim() && (
+        <button type="button" onClick={submit} className={`text-callout font-semibold shrink-0 ${color}`}>
+          {buttonLabel}
+        </button>
+      )}
+    </>
+  );
+  const plus = (
+    // Same footprint as a CheckButton so it lines up with task rows.
+    <span className="w-[22px] flex justify-center shrink-0">
+      <Plus className={`w-5 h-5 ${color}`} strokeWidth={2.25} />
+    </span>
+  );
+
+  if (variant === 'row') {
+    return (
+      <div className="flex items-center gap-3 pl-4">
+        {plus}
+        <div className="row-sep flex-1 min-w-0 flex items-center gap-2 pr-4 min-h-[48px] border-b border-theme-border">{field}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2.5 h-11 px-3 rounded-squircle bg-theme-card-subtle">
+      {plus}
+      {field}
+    </div>
   );
 };
 
@@ -184,43 +218,23 @@ export const QuickAddForm: React.FC<QuickAddFormProps> = ({ placeholder, onSubmi
 // EmptyState
 // ---------------------------------------------------------------------------
 
-export const EmptyState: React.FC<{ icon?: React.ReactNode; children: React.ReactNode }> = ({ icon, children }) => (
-  <div className="py-5 text-center text-theme-text-muted text-xs bg-theme-card-subtle rounded-squircle border border-theme-border/40 space-y-1">
+export const EmptyState: React.FC<{ icon?: React.ReactNode; children: React.ReactNode; className?: string }> = ({ icon, children, className = '' }) => (
+  <div className={`py-8 px-6 text-center text-footnote text-theme-text-muted space-y-2 ${className}`}>
     {icon && <div className="flex justify-center">{icon}</div>}
     <div>{children}</div>
   </div>
 );
 
 // ---------------------------------------------------------------------------
-// Field helpers for forms
+// Form helpers
 // ---------------------------------------------------------------------------
 
+/** Standalone input / select / textarea. */
 export const inputClass =
-  'w-full bg-theme-card-subtle px-2.5 py-1.5 rounded-squircle border border-theme-border/60 text-theme-text outline-none focus:border-theme-accent text-xs';
+  'w-full h-11 px-3 rounded-squircle bg-theme-card-subtle text-body text-theme-text placeholder:text-theme-text-muted outline-none focus:ring-2 focus:ring-theme-accent/40';
 
-export const ToggleRow: React.FC<{
-  icon?: React.ReactNode;
-  label: React.ReactNode;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  children?: React.ReactNode;
-}> = ({ icon, label, checked, onChange, children }) => (
-  <div className="space-y-1.5 pt-1 border-t border-theme-border/40">
-    <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-xs font-semibold text-theme-text flex items-center gap-1">
-        {icon}
-        <span>{label}</span>
-      </span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={e => onChange(e.target.checked)}
-        className="accent-theme-accent rounded w-3.5 h-3.5"
-      />
-    </label>
-    {checked && children}
-  </div>
-);
+/** Borderless input that lives inside a list row. */
+export const rowInputClass = 'flex-1 min-w-0 bg-transparent text-body text-theme-text placeholder:text-theme-text-muted outline-none text-right';
 
 // ---------------------------------------------------------------------------
 // Switch
@@ -236,13 +250,13 @@ export const Switch: React.FC<{ checked: boolean; onChange: (checked: boolean) =
       haptic('light');
       onChange(!checked);
     }}
-    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-      checked ? 'bg-theme-accent' : 'bg-stone-300 dark:bg-stone-700'
+    className={`relative inline-flex h-[28px] w-[46px] shrink-0 rounded-full p-[2px] transition-colors duration-200 ${
+      checked ? 'bg-theme-accent' : 'bg-theme-card-subtle dark:bg-white/20'
     }`}
   >
     <span
-      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out my-0.5 ${
-        checked ? 'translate-x-4.5' : 'translate-x-0.5'
+      className={`h-6 w-6 rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.2)] transition-transform duration-200 ${
+        checked ? 'translate-x-[18px]' : 'translate-x-0'
       }`}
     />
   </button>

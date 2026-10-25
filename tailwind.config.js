@@ -17,11 +17,11 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        'squircle-sm': '12px',
-        'squircle': '16px',
-        'squircle-md': '20px',
-        'squircle-lg': '24px',
-        'squircle-xl': '32px',
+        'squircle-sm': '10px',
+        'squircle': '14px',
+        'squircle-md': '18px',
+        'squircle-lg': '22px',
+        'squircle-xl': '28px',
       },
       colors: {
         theme: {
@@ -32,11 +32,22 @@ export default {
           'text-secondary': withOpacity('--text-secondary'),
           'text-muted': withOpacity('--text-muted'),
           accent: withOpacity('--accent-primary'),
-          'accent-secondary': withOpacity('--accent-secondary'),
           'accent-subtle': withOpacity('--accent-subtle'),
           'accent-contrast': withOpacity('--accent-contrast'),
           border: withOpacity('--border-subtle'),
         }
+      },
+      // iOS-like type scale, tuned for Chinese text on ~390px-wide phones.
+      fontSize: {
+        'caption2': ['11px', '14px'],
+        'caption': ['12px', '16px'],
+        'footnote': ['13px', '18px'],
+        'callout': ['14px', '20px'],
+        'body': ['15px', '22px'],
+        'headline': ['17px', '24px'],
+        'title3': ['20px', '26px'],
+        'title2': ['22px', '28px'],
+        'title1': ['28px', '34px'],
       },
       spacing: {
         '4.5': '1.125rem',

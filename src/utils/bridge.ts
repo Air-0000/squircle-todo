@@ -29,7 +29,8 @@ export const nativeBridge = {
     const bridge = native();
     if (bridge) {
       bridge.performHapticFeedback(type);
-    } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator && navigator.userActivation?.hasBeenActive !== false) {
+      // Browsers reject vibrate() before the first user gesture.
       navigator.vibrate(VIBRATION_PATTERNS[type]);
     }
   },

@@ -1,12 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toDateKey } from '../../../domain/dates';
+import type { Task } from '../../../domain/task';
 import { useTaskStore } from '../../../stores/useTaskStore';
 import { haptic } from '../../../utils/bridge';
+import { CardList } from '../../ui/List';
 import { ModuleCard } from '../../ui/ModuleCard';
-import { openTask } from '../../tasks/taskActions';
+import { EmptyState } from '../../ui/controls';
+import { TaskRow } from '../../tasks/TaskRow';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** A task's day on the calendar: its due date, otherwise the day it was created. */
+const dayOf = (t: Task) => t.dueDate ?? toDateKey(new Date(t.createdAt));
 
 /** Month grid; a day lists tasks due that day (or created that day when no due date). */
 export const CalendarModule: React.FC = () => {
@@ -21,51 +27,55 @@ export const CalendarModule: React.FC = () => {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const leadingBlanks = month.getDay();
 
-  const dayTasks = useMemo(
-    () => tasks.filter(t => !t.isTemplate && (t.dueDate ?? toDateKey(new Date(t.createdAt))) === selected),
-    [tasks, selected],
-  );
+  const byDay = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of tasks) {
+      if (t.isTemplate) continue;
+      const key = dayOf(t);
+      map.set(key, [...(map.get(key) ?? []), t]);
+    }
+    return map;
+  }, [tasks]);
+  const dayTasks = byDay.get(selected) ?? [];
 
   const shiftMonth = (delta: number) => {
     setMonth(new Date(year, monthIndex + delta, 1));
     haptic('light');
   };
-
-  const navButton = 'p-1 rounded-squircle hover:bg-theme-card-subtle text-theme-text-secondary';
+  const navButton = 'w-8 h-8 rounded-full flex items-center justify-center text-theme-accent active:bg-theme-card-subtle';
 
   return (
     <ModuleCard
-      icon={CalendarIcon}
-      iconTone="bg-blue-500/15 border-blue-500/25 text-blue-500"
-      title="月度全景日历"
-      subtitle={`${year}年 ${monthIndex + 1}月`}
+      icon={CalendarDays}
+      iconTone="bg-blue-500 text-white"
+      title={`${year}年${monthIndex + 1}月`}
+      subtitle="按截止日查看待办"
       actions={
         <>
           <button onClick={() => shiftMonth(-1)} className={navButton} aria-label="上个月">
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-5 h-5" />
           </button>
           <button onClick={() => shiftMonth(1)} className={navButton} aria-label="下个月">
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-5 h-5" />
           </button>
         </>
       }
     >
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-theme-text-muted">
+      <div className="grid grid-cols-7 text-center">
         {WEEKDAYS.map(w => (
-          <div key={w} className="py-1">
+          <div key={w} className="text-caption2 font-semibold text-theme-text-muted pb-1">
             {w}
           </div>
         ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {Array.from({ length: leadingBlanks }, (_, i) => (
-          <div key={`blank-${i}`} className="h-7" />
+        {Array.from({ length: month.getDay() }, (_, i) => (
+          <div key={`blank-${i}`} />
         ))}
         {Array.from({ length: daysInMonth }, (_, i) => {
           const key = toDateKey(new Date(year, monthIndex, i + 1));
           const isSelected = key === selected;
+          const isToday = key === today;
+          const hasTasks = byDay.has(key);
           return (
             <button
               key={key}
@@ -73,40 +83,34 @@ export const CalendarModule: React.FC = () => {
                 setSelected(key);
                 haptic('light');
               }}
-              className={`h-7 rounded-squircle text-xs font-semibold flex items-center justify-center transition-all ${
-                isSelected
-                  ? 'bg-theme-accent text-theme-accent-contrast shadow-2xs font-bold'
-                  : key === today
-                    ? 'border border-theme-accent text-theme-accent font-bold'
-                    : 'text-theme-text hover:bg-theme-card-subtle'
-              }`}
+              aria-pressed={isSelected}
+              className="h-11 flex flex-col items-center justify-center gap-0.5"
             >
-              {i + 1}
+              <span
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-callout tabular-nums transition-colors ${
+                  isSelected
+                    ? 'bg-theme-accent text-theme-accent-contrast font-semibold'
+                    : isToday
+                      ? 'text-theme-accent font-semibold'
+                      : 'text-theme-text'
+                }`}
+              >
+                {i + 1}
+              </span>
+              <span className={`w-1 h-1 rounded-full ${hasTasks && !isSelected ? 'bg-theme-text-muted' : 'bg-transparent'}`} />
             </button>
           );
         })}
       </div>
-      <div className="pt-2 border-t border-theme-border/50 text-xs">
-        <div className="text-[11px] text-theme-text-secondary mb-1">
-          {selected} 待办 ({dayTasks.length})
-        </div>
-        {dayTasks.length === 0 ? (
-          <div className="py-2 text-[11px] text-theme-text-muted text-center">当日暂无待办事项</div>
-        ) : (
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {dayTasks.map(t => (
-              <div
-                key={t.id}
-                onClick={() => openTask(t.id)}
-                className="p-1.5 rounded-squircle bg-theme-card-subtle hover:bg-theme-card border border-theme-border/50 flex items-center gap-2 cursor-pointer text-xs"
-              >
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.completed ? 'bg-emerald-500' : 'bg-theme-accent'}`} />
-                <span className={`truncate ${t.completed ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>{t.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {dayTasks.length === 0 ? (
+        <EmptyState className="!py-3 border-t border-theme-border -mx-4 -mb-4">{selected === today ? '今天' : selected.slice(5)} 没有待办</EmptyState>
+      ) : (
+        <CardList>
+          {dayTasks.map(t => (
+            <TaskRow key={t.id} task={t} showPanel />
+          ))}
+        </CardList>
+      )}
     </ModuleCard>
   );
 };

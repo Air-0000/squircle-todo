@@ -25,14 +25,15 @@ const ActiveView: React.FC = () => {
 
 /** Floating "+" above the tab bar; files new tasks into the panel being viewed. */
 const AddTaskFab: React.FC = () => {
+  const activeTab = useUIStore(s => s.activeTab);
+  if (activeTab === 'analytics' || activeTab === 'settings') return null;
   const handleClick = () => {
-    const { activeTab, openAddTask } = useUIStore.getState();
     const onPanel = usePanelStore.getState().panels.some(p => p.id === activeTab);
-    openAddTask({ target: onPanel ? activeTab : 'inbox', period: 'daily' });
+    useUIStore.getState().openAddTask({ target: onPanel ? activeTab : 'inbox', period: 'daily' });
   };
   return (
-    <div style={{ bottom: 'calc(max(var(--safe-area-inset-bottom, 0px), var(--sab, 0px), 12px) + 68px)' }} className="fixed right-4 z-40">
-      <SquircleButton size="fab" variant="filled" icon={<Plus className="w-6 h-6" />} onClick={handleClick} aria-label="添加新待办事件" />
+    <div style={{ bottom: 'calc(max(var(--safe-area-inset-bottom, 0px), var(--sab, 0px), 8px) + 66px)' }} className="fixed right-5 z-40">
+      <SquircleButton size="fab" icon={<Plus className="w-7 h-7" strokeWidth={2.4} />} onClick={handleClick} aria-label="新建待办" />
     </div>
   );
 };
@@ -42,16 +43,10 @@ export const App: React.FC = () => {
   const activeTab = useUIStore(s => s.activeTab);
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-theme-bg text-theme-text transition-colors duration-300 relative overflow-x-hidden">
-      <div className="fixed inset-0 pointer-events-none -z-10 ambient-glow-mesh" aria-hidden="true" />
+    <div className="flex-1 flex flex-col min-h-screen bg-theme-bg text-theme-text transition-colors duration-300">
       <AppHeader />
-      <main className="flex-1 px-4 py-3 pb-32 max-w-lg mx-auto w-full">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.12, ease: 'easeOut' }}
-        >
+      <main className="flex-1 px-4 pt-4 pb-40 max-w-lg mx-auto w-full">
+        <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
           <ActiveView />
         </motion.div>
       </main>

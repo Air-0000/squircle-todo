@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders } from 'lucide-react';
+import { Ruler } from 'lucide-react';
 import type { SpecField } from '../../../domain/panels';
 import { ModuleCard } from '../../ui/ModuleCard';
 import type { ModuleProps } from './types';
@@ -14,20 +14,15 @@ const DEFAULT_FIELDS: SpecField[] = [
 export const SpecsModule: React.FC<ModuleProps> = ({ panel }) => {
   const fields = panel.specsFields?.length ? panel.specsFields : DEFAULT_FIELDS;
   return (
-    <ModuleCard
-      icon={Sliders}
-      iconTone="bg-cyan-500/15 border-cyan-500/25 text-cyan-500"
-      title={`${panel.name} 规格参数`}
-      subtitle="常用规格与技术参考参数"
-    >
-      <div className="grid grid-cols-2 gap-2">
+    <ModuleCard icon={Ruler} iconTone="bg-cyan-500 text-white" title="规格参数" subtitle="常用尺寸与技术规范">
+      <dl className="divide-y divide-theme-border -mb-1">
         {fields.map(field => (
-          <div key={field.label} className="p-2.5 rounded-squircle bg-theme-card-subtle border border-theme-border/60">
-            <span className="text-[10px] text-theme-text-muted block">{field.label}</span>
-            <span className="text-xs font-bold text-theme-text font-mono truncate block mt-0.5">{field.value}</span>
+          <div key={field.label} className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0">
+            <dt className="text-body text-theme-text-secondary shrink-0">{field.label}</dt>
+            <dd className="text-body text-theme-text text-right truncate">{field.value}</dd>
           </div>
         ))}
-      </div>
+      </dl>
     </ModuleCard>
   );
 };

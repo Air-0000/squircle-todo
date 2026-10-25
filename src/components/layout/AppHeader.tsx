@@ -1,90 +1,81 @@
 import React from 'react';
-import { Bell, CheckCircle2, Clock, Flame, Settings } from 'lucide-react';
-import { useUIStore, type TabId } from '../../stores/useUIStore';
+import { Bell, SlidersHorizontal, Timer } from 'lucide-react';
+import { TEMPLATE_LABELS } from '../../domain/panels';
+import { isActiveEmergency } from '../../domain/task';
+import { useUIStore } from '../../stores/useUIStore';
 import { usePanelStore } from '../../stores/usePanelStore';
-import { useThemeDefinition } from '../../stores/useThemeStore';
+import { useTaskStore } from '../../stores/useTaskStore';
 import { useFocusStore } from '../../stores/useFocusStore';
 import { useUnreadBulletinCount } from '../../stores/useBulletinStore';
-import type { Panel } from '../../domain/panels';
-import { panelIcon } from '../ui/icons';
 import { haptic } from '../../utils/bridge';
 
-interface TabMeta {
-  title: string;
-  subtitle: string;
-  icon: React.ComponentType<{ className?: string }>;
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+function todayLabel(now = new Date()): string {
+  return `${now.getMonth() + 1}月${now.getDate()}日 周${WEEKDAYS[now.getDay()]}`;
 }
 
-const BASE_TAB_META: Record<string, TabMeta> = {
-  tasks: { title: '待办清单', subtitle: '灵动待办 · 周期自适应 · 突发响应', icon: CheckCircle2 },
-  analytics: { title: '专注成就', subtitle: '连续打卡 · 专注时长 · 勋章沉淀', icon: Flame },
-  settings: { title: '偏好设置', subtitle: '外观主题 · 自定义面板 · 数据备份', icon: Settings },
-};
+const IconButton: React.FC<{ label: string; onClick: () => void; children: React.ReactNode; dot?: boolean }> = ({ label, onClick, children, dot }) => (
+  <button
+    type="button"
+    onClick={() => {
+      haptic('light');
+      onClick();
+    }}
+    aria-label={label}
+    title={label}
+    className="relative w-9 h-9 rounded-full bg-theme-card-subtle text-theme-accent flex items-center justify-center active:opacity-60 transition-opacity"
+  >
+    {children}
+    {dot && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-theme-bg" />}
+  </button>
+);
 
-function tabMeta(tab: TabId, panels: Panel[]): TabMeta {
-  if (BASE_TAB_META[tab]) return BASE_TAB_META[tab];
-  const panel = panels.find(p => p.id === tab);
-  if (panel) return { title: panel.name, subtitle: panel.description || '自定义功能看板', icon: panelIcon(panel.icon) };
-  return BASE_TAB_META.tasks;
-}
-
-const headerButton =
-  'relative p-1.5 sm:px-2 sm:py-1 rounded-squircle bg-theme-card border border-white/30 dark:border-white/10 text-theme-text text-xs font-bold shadow-2xs active:scale-95 transition-all flex items-center gap-1';
-
+/** Sticky large-title header for the current tab. */
 export const AppHeader: React.FC = () => {
   const activeTab = useUIStore(s => s.activeTab);
-  const openBulletins = useUIStore(s => s.open);
-  const panels = usePanelStore(s => s.panels);
-  const theme = useThemeDefinition();
+  const panel = usePanelStore(s => s.panels.find(p => p.id === activeTab));
+  const openCount = useTaskStore(s => s.tasks.filter(t => !t.completed && !t.isTemplate).length);
+  const emergencyCount = useTaskStore(s => s.tasks.filter(isActiveEmergency).length);
   const unread = useUnreadBulletinCount();
-  const meta = tabMeta(activeTab, panels);
-  const Icon = meta.icon;
+
+  let title = '待办';
+  let subtitle = `${todayLabel()} · ${openCount > 0 ? `${openCount} 项进行中` : '全部完成'}`;
+  if (activeTab === 'analytics') {
+    title = '成就';
+    subtitle = todayLabel();
+  } else if (activeTab === 'settings') {
+    title = '设置';
+    subtitle = '外观、面板与数据';
+  } else if (panel) {
+    title = panel.name;
+    subtitle = `${TEMPLATE_LABELS[panel.templateId]} · ${panel.enabledModules.length} 个模块`;
+  }
+  if (activeTab === 'tasks' && emergencyCount > 0) subtitle = `${todayLabel()} · ${emergencyCount} 项紧急`;
 
   return (
     <header
       style={{ paddingTop: 'max(var(--safe-area-inset-top, 0px), var(--sat, 0px), env(safe-area-inset-top, 0px), 38px)' }}
-      className="px-4 pb-2.5 pt-2 flex items-center justify-between border-b border-white/20 dark:border-white/10 sticky top-0 z-30 bg-theme-bg/95 shadow-2xs transition-colors"
+      className="sticky top-0 z-30 bar-material border-b border-theme-border"
     >
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-8.5 h-8.5 rounded-squircle bg-theme-accent/15 border border-theme-accent/25 flex items-center justify-center shrink-0 shadow-2xs">
-          <Icon className="w-4 h-4 text-theme-accent" />
-        </div>
+      <div className="max-w-lg mx-auto px-4 pt-2 pb-3 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-sm font-bold tracking-tight text-theme-text leading-tight truncate">{meta.title}</h1>
-            <span className="text-[10px] px-1.5 py-px rounded-full bg-theme-card text-theme-text-secondary border border-white/30 dark:border-white/10 shrink-0 font-medium">
-              {theme.name}
-            </span>
-          </div>
-          <p className="text-[11px] text-theme-text-secondary truncate mt-0.5">{meta.subtitle}</p>
+          <h1 className="text-title1 font-bold tracking-tight text-theme-text truncate">{title}</h1>
+          <p className={`text-footnote truncate ${activeTab === 'tasks' && emergencyCount > 0 ? 'text-rose-500' : 'text-theme-text-secondary'}`}>{subtitle}</p>
         </div>
-      </div>
-
-      <div className="flex items-center gap-1.5 shrink-0">
-        <button
-          onClick={() => useFocusStore.getState().open({ mode: 'pomodoro' })}
-          aria-label="打开专注时钟"
-          title="打开专注翻页时钟"
-          className={headerButton}
-        >
-          <Clock className="w-3.5 h-3.5 text-theme-accent" />
-          <span className="text-[10px] hidden sm:inline">专注时钟</span>
-        </button>
-        <button
-          onClick={() => {
-            haptic('light');
-            openBulletins('bulletinListOpen');
-          }}
-          aria-label="打开通知公告与更新日志"
-          title="通知公告与更新日志中心"
-          className={headerButton}
-        >
-          <Bell className="w-3.5 h-3.5 text-theme-accent" />
-          {unread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-theme-bg animate-pulse" />
+        <div className="flex items-center gap-2 shrink-0 pb-0.5">
+          {panel && (
+            <IconButton label="管理面板模块" onClick={() => useUIStore.getState().configurePanel(panel.id)}>
+              <SlidersHorizontal className="w-[18px] h-[18px]" />
+            </IconButton>
           )}
-          <span className="text-[10px] hidden sm:inline">公告</span>
-        </button>
+          <IconButton label="专注时钟" onClick={() => useFocusStore.getState().open({ mode: 'pomodoro' })}>
+            <Timer className="w-[18px] h-[18px]" />
+          </IconButton>
+          <IconButton label="通知公告" onClick={() => useUIStore.getState().open('bulletinListOpen')} dot={unread > 0}>
+            <Bell className="w-[18px] h-[18px]" />
+          </IconButton>
+        </div>
       </div>
     </header>
   );

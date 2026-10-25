@@ -1,40 +1,53 @@
 import React from 'react';
-import { SquircleCard } from './SquircleCard';
 
 interface ModuleCardProps {
   icon: React.ComponentType<{ className?: string }>;
-  /** Tailwind classes for the icon badge (background, border, text colour). */
+  /** Classes for the icon square (background + icon colour). */
   iconTone?: string;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
+  /** Right side of the header, usually plain text buttons. */
   actions?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
 }
 
-/** Card with an icon + title header, used by every panel module and most settings sections. */
+/** Card with an icon + title header, used by every panel module. */
 export const ModuleCard: React.FC<ModuleCardProps> = ({
   icon: Icon,
-  iconTone = 'bg-theme-accent/15 border-theme-accent/25 text-theme-accent',
+  iconTone = 'bg-theme-accent text-theme-accent-contrast',
   title,
   subtitle,
   actions,
-  className = 'bg-theme-card border border-theme-border',
+  className = '',
   children,
 }) => (
-  <SquircleCard elevation={2} radius="lg" className={`p-4 shadow-squircle space-y-3 ${className}`}>
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2 min-w-0">
-        <div className={`w-8 h-8 rounded-squircle border flex items-center justify-center shrink-0 ${iconTone}`}>
-          <Icon className="w-4 h-4" />
-        </div>
-        <div className="min-w-0">
-          <h3 className="text-xs font-bold text-theme-text truncate">{title}</h3>
-          {subtitle && <p className="text-[10px] text-theme-text-muted mt-0.5 truncate">{subtitle}</p>}
-        </div>
+  <section className={`bg-theme-card rounded-squircle-md shadow-squircle p-4 space-y-3.5 ${className}`}>
+    <header className="flex items-center gap-3">
+      <span className={`w-[30px] h-[30px] rounded-[8px] flex items-center justify-center shrink-0 ${iconTone}`}>
+        <Icon className="w-[18px] h-[18px]" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <h3 className="text-body font-semibold text-theme-text truncate">{title}</h3>
+        {subtitle && <p className="text-footnote text-theme-text-secondary truncate">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-1 shrink-0">{actions}</div>}
-    </div>
+    </header>
     {children}
-  </SquircleCard>
+  </section>
+);
+
+/** Plain accent text button for card headers ("编辑", "重置"). */
+export const TextButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'accent' | 'danger' | 'muted' }> = ({
+  tone = 'accent',
+  className = '',
+  ...rest
+}) => (
+  <button
+    type="button"
+    className={`h-8 px-1.5 text-callout font-medium flex items-center gap-1 active:opacity-50 transition-opacity ${
+      tone === 'danger' ? 'text-rose-500' : tone === 'muted' ? 'text-theme-text-secondary' : 'text-theme-accent'
+    } ${className}`}
+    {...rest}
+  />
 );
