@@ -1,5 +1,9 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+
+// Domain tests assert local-calendar behaviour; pin the zone the app is used in.
+process.env.TZ = 'Asia/Shanghai';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -33,5 +37,9 @@ export default defineConfig({
         },
       },
     },
+  },
+  test: {
+    include: ['src/**/*.test.ts'],
+    environment: 'node',
   },
 });

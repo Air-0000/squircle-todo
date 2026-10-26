@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#FAF7F2" />
+    <meta name="theme-color" content="#F6F2ED" />
     <meta name="color-scheme" content="light dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -11,13 +11,9 @@
     <script>
       (function() {
         try {
+          // Pre-paint defaults; MainActivity injects the real insets once the page loads.
           var top = 38;
           var bottom = 16;
-          if (window.AndroidBridge && window.AndroidBridge.getSafeAreaInsets) {
-            var insets = JSON.parse(window.AndroidBridge.getSafeAreaInsets());
-            if (insets.top > 0) top = Math.max(insets.top, 38);
-            if (insets.bottom > 0) bottom = Math.max(insets.bottom, 16);
-          }
           document.documentElement.style.setProperty('--safe-area-inset-top', top + 'px');
           document.documentElement.style.setProperty('--sat', top + 'px');
           document.documentElement.style.setProperty('--safe-area-inset-bottom', bottom + 'px');

@@ -1,234 +1,89 @@
-export const isNativeAndroid = (): boolean => {
-  return typeof window !== 'undefined' && typeof window.AndroidBridge !== 'undefined';
+/**
+ * Thin wrapper over the Android WebView bridge (`window.AndroidBridge`, see
+ * android/.../WebAppInterface.java) with browser fallbacks.
+ */
+
+export type HapticType = 'light' | 'medium' | 'heavy' | 'success' | 'error';
+
+const VIBRATION_PATTERNS: Record<HapticType, number | number[]> = {
+  light: 10,
+  medium: 25,
+  heavy: 45,
+  success: [15, 30, 20],
+  error: [30, 40, 30, 40],
 };
 
-export interface HttpResponse {
-  status: number;
-  data: string;
-  ok: boolean;
-  error?: string;
-}
+const native = () => (typeof window !== 'undefined' ? window.AndroidBridge : undefined);
 
-export interface NativeBridgeWrapper {
-  setStatusBarTheme: (dark: boolean, hexColor: string) => void;
-  performHapticFeedback: (type: 'light' | 'medium' | 'heavy' | 'success' | 'error') => void;
-  shareBackupFile: (fileName: string, mimeType: string, content: string) => void;
-  requestHttp: (urlString: string, method: string, headersJson: string, body: string) => string;
-  requestHttpAsync: (urlString: string, method?: string, headersJson?: string, body?: string, timeoutMs?: number) => Promise<HttpResponse>;
-  downloadAndInstallApk: (primaryUrl: string, versionName: string, fallbackUrl?: string, authHeader?: string) => void;
-  openBrowser: (url: string) => void;
-  getDisplayRefreshRate: () => number;
-  getAppVersion: () => { versionCode: number; versionName: string } | null;
-  getNetworkType: () => 'wifi' | 'cellular' | 'none' | 'unknown';
-}
+export const nativeBridge = {
+  setStatusBarTheme(dark: boolean, hexColor: string): void {
+    const bridge = native();
+    if (bridge) {
+      bridge.setStatusBarTheme(dark, hexColor);
+      return;
+    }
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', hexColor);
+  },
 
-const pendingHttpMap = new Map<string, {
-  resolve: (res: HttpResponse) => void;
-  timer: any;
-}>();
+  haptic(type: HapticType = 'light'): void {
+    const bridge = native();
+    if (bridge) {
+      bridge.performHapticFeedback(type);
+    } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator && navigator.userActivation?.hasBeenActive !== false) {
+      // Browsers reject vibrate() before the first user gesture.
+      navigator.vibrate(VIBRATION_PATTERNS[type]);
+    }
+  },
 
-if (typeof window !== 'undefined') {
-  window.__onNativeHttpResponse = (responseJson: string) => {
+  /** Native share sheet on Android, file download in the browser. */
+  shareFile(fileName: string, mimeType: string, content: string): void {
+    const bridge = native();
+    if (bridge) {
+      bridge.shareBackupFile(fileName, mimeType, content);
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  openUrl(url: string): void {
+    const bridge = native();
+    if (bridge?.openBrowser) bridge.openBrowser(url);
+    else window.open(url, '_blank', 'noopener');
+  },
+
+  /** True inside an Android shell that can update itself (see useUpdateStore). */
+  canSelfUpdate(): boolean {
+    return typeof native()?.checkForUpdate === 'function';
+  },
+
+  checkForUpdate(): void {
+    native()?.checkForUpdate?.();
+  },
+
+  downloadUpdate(): void {
+    native()?.downloadUpdate?.();
+  },
+
+  cancelUpdateDownload(): void {
+    native()?.cancelUpdateDownload?.();
+  },
+
+  /** Screen refresh rate reported by the Android shell; null in a plain browser. */
+  displayRefreshRate(): number | null {
     try {
-      const parsed = typeof responseJson === 'string' ? JSON.parse(responseJson) : responseJson;
-      const { requestId, status, data, ok, error } = parsed;
-      const pending = pendingHttpMap.get(requestId);
-      if (pending) {
-        clearTimeout(pending.timer);
-        pendingHttpMap.delete(requestId);
-        pending.resolve({
-          status: status || 0,
-          data: data || '',
-          ok: Boolean(ok),
-          error: error || undefined,
-        });
-      }
-    } catch (e) {
-      console.error('[Bridge] Failed to handle native HTTP response callback:', e);
-    }
-  };
-}
-
-export const nativeBridge: NativeBridgeWrapper = {
-  setStatusBarTheme: (dark: boolean, hexColor: string) => {
-    if (isNativeAndroid() && window.AndroidBridge?.setStatusBarTheme) {
-      window.AndroidBridge.setStatusBarTheme(dark, hexColor);
-    } else {
-      const meta = document.querySelector('meta[name="theme-color"]');
-      if (meta) {
-        meta.setAttribute('content', hexColor);
-      }
-    }
-  },
-
-  performHapticFeedback: (type: 'light' | 'medium' | 'heavy' | 'success' | 'error') => {
-    if (isNativeAndroid() && window.AndroidBridge?.performHapticFeedback) {
-      window.AndroidBridge.performHapticFeedback(type);
-    } else if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      switch (type) {
-        case 'light': navigator.vibrate(10); break;
-        case 'medium': navigator.vibrate(25); break;
-        case 'heavy': navigator.vibrate(45); break;
-        case 'success': navigator.vibrate([15, 30, 20]); break;
-        case 'error': navigator.vibrate([30, 40, 30, 40]); break;
-      }
-    }
-  },
-
-  shareBackupFile: (fileName: string, mimeType: string, content: string) => {
-    if (isNativeAndroid() && window.AndroidBridge?.shareBackupFile) {
-      window.AndroidBridge.shareBackupFile(fileName, mimeType, content);
-    } else if (typeof document !== 'undefined') {
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  },
-
-  requestHttp: (urlString: string, method: string, headersJson: string, body: string): string => {
-    if (isNativeAndroid() && window.AndroidBridge?.requestHttp) {
-      return window.AndroidBridge.requestHttp(urlString, method, headersJson, body);
-    }
-    return '';
-  },
-
-  requestHttpAsync: (
-    urlString: string,
-    method: string = 'GET',
-    headersJson: string = '{}',
-    body: string = '',
-    timeoutMs: number = 2500
-  ): Promise<HttpResponse> => {
-    // 1. Preferred Non-blocking Asynchronous Android Bridge
-    if (isNativeAndroid() && typeof window.AndroidBridge?.requestHttpAsync === 'function') {
-      return new Promise<HttpResponse>((resolve) => {
-        const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-        const timer = setTimeout(() => {
-          pendingHttpMap.delete(requestId);
-          resolve({
-            status: 0,
-            data: '',
-            ok: false,
-            error: `连接超时 (${timeoutMs}ms)`,
-          });
-        }, timeoutMs + 400);
-
-        pendingHttpMap.set(requestId, { resolve, timer });
-
-        try {
-          window.AndroidBridge!.requestHttpAsync!(
-            requestId,
-            urlString,
-            method,
-            headersJson,
-            body,
-            timeoutMs
-          );
-        } catch (e: any) {
-          clearTimeout(timer);
-          pendingHttpMap.delete(requestId);
-          resolve({
-            status: 0,
-            data: '',
-            ok: false,
-            error: e?.message || '调用原生网络接口失败',
-          });
-        }
-      });
-    }
-
-    // 2. Fallback to synchronous bridge if async is not available in older wrapper
-    if (isNativeAndroid() && typeof window.AndroidBridge?.requestHttp === 'function') {
-      try {
-        const raw = window.AndroidBridge.requestHttp(urlString, method, headersJson, body);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          return Promise.resolve({
-            status: parsed.status || 0,
-            data: parsed.data || '',
-            ok: Boolean(parsed.ok),
-            error: parsed.error || undefined,
-          });
-        }
-      } catch (e: any) {}
-    }
-
-    return Promise.resolve({
-      status: 0,
-      data: '',
-      ok: false,
-      error: 'Native HTTP bridge unavailable',
-    });
-  },
-
-  getNetworkType: (): 'wifi' | 'cellular' | 'none' | 'unknown' => {
-    if (isNativeAndroid() && typeof window.AndroidBridge?.getNetworkType === 'function') {
-      try {
-        const type = window.AndroidBridge.getNetworkType();
-        if (type === 'wifi' || type === 'cellular' || type === 'none') {
-          return type;
-        }
-      } catch (e) {}
-    }
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      return 'none';
-    }
-    return 'unknown';
-  },
-
-  downloadAndInstallApk: (
-    primaryUrl: string, 
-    versionName: string, 
-    fallbackUrl: string = '', 
-    authHeader: string = ''
-  ) => {
-    if (isNativeAndroid() && window.AndroidBridge?.downloadAndInstallApk) {
-      try {
-        (window.AndroidBridge as any).downloadAndInstallApk(primaryUrl, fallbackUrl, authHeader, versionName);
-      } catch (e) {
-        window.AndroidBridge.downloadAndInstallApk(primaryUrl, versionName);
-      }
-    } else if (typeof window !== 'undefined') {
-      // Browser fallback: download directly
-      const a = document.createElement('a');
-      a.href = primaryUrl;
-      a.download = `squircle_todo_${versionName || 'latest'}.apk`;
-      a.target = '_blank';
-      a.click();
-    }
-  },
-
-  openBrowser: (url: string) => {
-    if (isNativeAndroid() && (window.AndroidBridge as any)?.openBrowser) {
-      (window.AndroidBridge as any).openBrowser(url);
-    } else if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
-    }
-  },
-
-  getDisplayRefreshRate: (): number => {
-    if (isNativeAndroid() && (window.AndroidBridge as any)?.getDisplayRefreshRate) {
-      try {
-        const rate = (window.AndroidBridge as any).getDisplayRefreshRate();
-        if (typeof rate === 'number' && rate > 0) return Math.round(rate);
-      } catch (e) {}
-    }
-    return 120;
-  },
-
-  getAppVersion: () => {
-    if (isNativeAndroid() && window.AndroidBridge?.getAppVersion) {
-      try {
-        const json = window.AndroidBridge.getAppVersion();
-        return JSON.parse(json);
-      } catch (e) {
-        // Fallback
-      }
+      const rate = native()?.getDisplayRefreshRate?.();
+      if (typeof rate === 'number' && rate > 0) return Math.round(rate);
+    } catch {
+      // fall through
     }
     return null;
-  }
+  },
 };
+
+/** Shorthand used by UI event handlers. */
+export const haptic = nativeBridge.haptic;

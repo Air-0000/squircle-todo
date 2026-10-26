@@ -18,6 +18,8 @@ android/app/build/
 android/build/
 android/local.properties
 android/captures/
+# Web bundle copied in by build_apk.sh
+android/app/src/main/assets/
 *.apk
 *.aab
 

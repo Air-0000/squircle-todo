@@ -1,13 +1,10 @@
 package com.squircle.todo;
 
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.util.Log;
 import android.view.Display;
 import android.view.View;
@@ -21,30 +18,24 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.webkit.WebViewAssetLoader;
 
-import java.io.File;
-import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private WebView webView;
-    private WebAppInterface webAppInterface;
     private int currentTopDp = 38;
     private int currentBottomDp = 16;
     private int currentLeftDp = 0;
     private int currentRightDp = 0;
-    private File pendingInstallApk = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,17 +55,20 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
-        webView.setBackgroundColor(Color.parseColor("#FAF7F2"));
+        webView.setBackgroundColor(Color.parseColor("#F6F2ED"));
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
         setContentView(webView);
 
-        // Initialize Native Bridge with safe initial insets
-        webAppInterface = new WebAppInterface(this, webView);
-        webAppInterface.updateInsets(currentTopDp, currentBottomDp, currentLeftDp, currentRightDp);
-        webView.addJavascriptInterface(webAppInterface, "AndroidBridge");
+        // Native bridge exposed to the web app as window.AndroidBridge; update events go back
+        // through window.__onUpdateEvent (JSON is a valid JS object literal).
+        webView.addJavascriptInterface(new WebAppInterface(this, event -> runOnUiThread(() -> {
+            if (webView != null) {
+                webView.evaluateJavascript("window.__onUpdateEvent && window.__onUpdateEvent(" + event + ")", null);
+            }
+        })), "AndroidBridge");
 
         // Safe Area Insets Dispatcher
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, windowInsets) -> {
@@ -89,7 +83,6 @@ public class MainActivity extends AppCompatActivity {
             currentLeftDp = Math.round(insets.left / density);
             currentRightDp = Math.round(insets.right / density);
 
-            webAppInterface.updateInsets(currentTopDp, currentBottomDp, currentLeftDp, currentRightDp);
             injectSafeAreaCssVariables();
             return windowInsets;
         });
@@ -102,7 +95,8 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        // Everything is served from bundled assets over https; no plain-http subresources.
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
@@ -190,11 +184,9 @@ public class MainActivity extends AppCompatActivity {
                 "  document.documentElement.style.setProperty('--safe-area-inset-right', '%dpx');" +
                 "  document.documentElement.style.setProperty('--sat', '%dpx');" +
                 "  document.documentElement.style.setProperty('--sab', '%dpx');" +
-                "  if (window.__updateSafeAreaInsets) { window.__updateSafeAreaInsets(%d, %d, %d, %d); }" +
                 "} catch(e) {}",
                 currentTopDp, currentBottomDp, currentLeftDp, currentRightDp,
-                currentTopDp, currentBottomDp,
-                currentTopDp, currentBottomDp, currentLeftDp, currentRightDp
+                currentTopDp, currentBottomDp
         );
         webView.evaluateJavascript(js, null);
     }
@@ -259,69 +251,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void setPendingInstallApk(File apkFile) {
-        this.pendingInstallApk = apkFile;
-    }
-
-    public void installApk(File apkFile) {
-        if (apkFile == null || !apkFile.exists()) {
-            Toast.makeText(this, "未找到下载的更新安装包", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!getPackageManager().canRequestPackageInstalls()) {
-                    this.pendingInstallApk = apkFile;
-                    Toast.makeText(this, "请开启“允许安装未知应用”权限以完成升级", Toast.LENGTH_LONG).show();
-                    Intent settingsIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                    settingsIntent.setData(Uri.parse("package:" + getPackageName()));
-                    settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(settingsIntent);
-                    return;
-                }
-            }
-
-            apkFile.setReadable(true, false);
-
-            Uri apkUri = FileProvider.getUriForFile(
-                    this,
-                    getPackageName() + ".fileprovider",
-                    apkFile
-            );
-
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-            List<ResolveInfo> resInfoList = getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
-            for (ResolveInfo resolveInfo : resInfoList) {
-                String packageName = resolveInfo.activityInfo.packageName;
-                grantUriPermission(packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            }
-
-            startActivity(intent);
-            pendingInstallApk = null;
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to launch package installer", e);
-            Toast.makeText(this, "调起系统安装器失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
         lockHighRefreshRate();
         if (webView != null) {
             webView.onResume();
-        }
-        if (pendingInstallApk != null && pendingInstallApk.exists()) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || getPackageManager().canRequestPackageInstalls()) {
-                File apk = pendingInstallApk;
-                pendingInstallApk = null;
-                installApk(apk);
-            }
         }
     }
 
@@ -335,10 +270,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        if (webAppInterface != null) {
-            webAppInterface.destroy();
-            webAppInterface = null;
-        }
         if (webView != null) {
             webView.destroy();
             webView = null;

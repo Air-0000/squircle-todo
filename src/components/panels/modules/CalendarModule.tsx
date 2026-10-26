@@ -1,137 +1,116 @@
-import React, { useState, useMemo } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { SquircleCard } from '../../common/SquircleCard';
+import React, { useMemo, useState } from 'react';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { toDateKey } from '../../../domain/dates';
+import type { Task } from '../../../domain/task';
 import { useTaskStore } from '../../../stores/useTaskStore';
-import { TodoItem } from '../../../types';
-import { nativeBridge } from '../../../utils/bridge';
-
-interface CalendarModuleProps {
-  onEditTask?: (task: TodoItem) => void;
-}
+import { haptic } from '../../../utils/bridge';
+import { CardList } from '../../ui/List';
+import { ModuleCard } from '../../ui/ModuleCard';
+import { EmptyState } from '../../ui/controls';
+import { TaskRow } from '../../tasks/TaskRow';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
-export const CalendarModule: React.FC<CalendarModuleProps> = ({ onEditTask }) => {
-  const { tasks } = useTaskStore();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDayStr, setSelectedDayStr] = useState(new Date().toISOString().split('T')[0]);
+/** A task's day on the calendar: its due date, otherwise the day it was created. */
+const dayOf = (t: Task) => t.dueDate ?? toDateKey(new Date(t.createdAt));
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
+/** Month grid; a day lists tasks due that day (or created that day when no due date). */
+export const CalendarModule: React.FC = () => {
+  const tasks = useTaskStore(s => s.tasks);
+  const [month, setMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selected, setSelected] = useState(() => toDateKey());
+  const today = toDateKey();
 
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayIndex = new Date(year, month, 1).getDay();
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
-    nativeBridge.performHapticFeedback('light');
+  const byDay = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of tasks) {
+      if (t.isTemplate) continue;
+      const key = dayOf(t);
+      map.set(key, [...(map.get(key) ?? []), t]);
+    }
+    return map;
+  }, [tasks]);
+  const dayTasks = byDay.get(selected) ?? [];
+
+  const shiftMonth = (delta: number) => {
+    setMonth(new Date(year, monthIndex + delta, 1));
+    haptic('light');
   };
-
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
-    nativeBridge.performHapticFeedback('light');
-  };
-
-  const selectedDayTasks = useMemo(() => {
-    return tasks.filter(t => {
-      const d = t.dueDate || (t.createdAt ? t.createdAt.split('T')[0] : '');
-      return d === selectedDayStr;
-    });
-  }, [tasks, selectedDayStr]);
+  const navButton = 'w-8 h-8 rounded-full flex items-center justify-center text-theme-accent active:bg-theme-card-subtle';
 
   return (
-    <SquircleCard elevation={2} radius="lg" className="p-4 bg-theme-card border border-theme-border shadow-squircle space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-squircle bg-blue-500/15 border border-blue-500/25 flex items-center justify-center text-blue-500 shrink-0">
-            <CalendarIcon className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-theme-text">月度全景日历</h3>
-            <p className="text-[10px] text-theme-text-muted mt-0.5">{year}年 {month + 1}月</p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-1">
-          <button
-            onClick={handlePrevMonth}
-            className="p-1 rounded-squircle hover:bg-theme-card-subtle text-theme-text-secondary"
-          >
-            <ChevronLeft className="w-4 h-4" />
+    <ModuleCard
+      icon={CalendarDays}
+      iconTone="bg-blue-500 text-white"
+      title={`${year}年${monthIndex + 1}月`}
+      subtitle="按截止日查看待办"
+      actions={
+        <>
+          <button onClick={() => shiftMonth(-1)} className={navButton} aria-label="上个月">
+            <ChevronLeft className="w-5 h-5" />
           </button>
-          <button
-            onClick={handleNextMonth}
-            className="p-1 rounded-squircle hover:bg-theme-card-subtle text-theme-text-secondary"
-          >
-            <ChevronRight className="w-4 h-4" />
+          <button onClick={() => shiftMonth(1)} className={navButton} aria-label="下个月">
+            <ChevronRight className="w-5 h-5" />
           </button>
-        </div>
-      </div>
-
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-theme-text-muted">
+        </>
+      }
+    >
+      <div className="grid grid-cols-7 text-center">
         {WEEKDAYS.map(w => (
-          <div key={w} className="py-1">{w}</div>
+          <div key={w} className="text-caption2 font-semibold text-theme-text-muted pb-1">
+            {w}
+          </div>
         ))}
-      </div>
-
-      {/* Days grid */}
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {Array.from({ length: firstDayIndex }).map((_, i) => (
-          <div key={`empty-${i}`} className="h-7" />
+        {Array.from({ length: month.getDay() }, (_, i) => (
+          <div key={`blank-${i}`} />
         ))}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1;
-          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          const isSelected = dateStr === selectedDayStr;
-          const isToday = dateStr === new Date().toISOString().split('T')[0];
-
+        {Array.from({ length: daysInMonth }, (_, i) => {
+          const key = toDateKey(new Date(year, monthIndex, i + 1));
+          const isSelected = key === selected;
+          const isToday = key === today;
+          const hasTasks = byDay.has(key);
           return (
             <button
-              key={dateStr}
+              key={key}
               onClick={() => {
-                setSelectedDayStr(dateStr);
-                nativeBridge.performHapticFeedback('light');
+                setSelected(key);
+                haptic('light');
               }}
-              className={`h-7 rounded-squircle text-xs font-semibold flex items-center justify-center transition-all ${
-                isSelected
-                  ? 'bg-theme-accent text-theme-accent-contrast shadow-2xs font-bold'
-                  : isToday
-                  ? 'border border-theme-accent text-theme-accent font-bold'
-                  : 'text-theme-text hover:bg-theme-card-subtle'
-              }`}
+              aria-pressed={isSelected}
+              className="h-11 flex flex-col items-center justify-center gap-0.5"
             >
-              {day}
+              <span
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-callout tabular-nums transition-colors ${
+                  isSelected
+                    ? 'bg-theme-accent text-theme-accent-contrast font-semibold'
+                    : isToday
+                      ? 'text-theme-accent font-semibold'
+                      : 'text-theme-text'
+                }`}
+              >
+                {i + 1}
+              </span>
+              <span className={`w-1 h-1 rounded-full ${hasTasks && !isSelected ? 'bg-theme-text-muted' : 'bg-transparent'}`} />
             </button>
           );
         })}
       </div>
-
-      {/* Selected Day Task Summary */}
-      <div className="pt-2 border-t border-theme-border/50 text-xs">
-        <div className="flex items-center justify-between text-[11px] text-theme-text-secondary mb-1">
-          <span>{selectedDayStr} 待办 ({selectedDayTasks.length})</span>
-        </div>
-        {selectedDayTasks.length === 0 ? (
-          <div className="py-2 text-[11px] text-theme-text-muted text-center">当日暂无待办事项</div>
-        ) : (
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {selectedDayTasks.map(t => (
-              <div
-                key={t.id}
-                onClick={() => onEditTask && onEditTask(t)}
-                className="p-1.5 rounded-squircle bg-theme-card-subtle hover:bg-theme-card border border-theme-border/50 flex items-center space-x-2 cursor-pointer text-xs"
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${t.completed || t.isCompleted ? 'bg-emerald-500' : 'bg-theme-accent'}`} />
-                <span className={`truncate ${t.completed || t.isCompleted ? 'line-through text-theme-text-muted' : 'text-theme-text'}`}>
-                  {t.title}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </SquircleCard>
+      {dayTasks.length === 0 ? (
+        <EmptyState className="!py-3 border-t border-theme-border -mx-4 -mb-4">{selected === today ? '今天' : selected.slice(5)} 没有待办</EmptyState>
+      ) : (
+        <CardList>
+          {dayTasks.map(t => (
+            <TaskRow key={t.id} task={t} showPanel />
+          ))}
+        </CardList>
+      )}
+    </ModuleCard>
   );
 };

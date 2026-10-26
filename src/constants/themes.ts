@@ -1,4 +1,8 @@
-import { ThemeMode, ToneLock } from '../types';
+export type ThemeMode = 'warm-morning' | 'cool-morning' | 'warm-evening' | 'cool-evening';
+/** 'auto' currently behaves like 'warm' (kept for stored settings). */
+export type ToneLock = 'auto' | 'warm' | 'cool';
+
+export const THEME_IDS: ThemeMode[] = ['warm-morning', 'cool-morning', 'warm-evening', 'cool-evening'];
 
 export interface ThemeDefinition {
   id: ThemeMode;
@@ -24,10 +28,10 @@ export const THEMES: Record<ThemeMode, ThemeDefinition> = {
     name: '晨曦暖阳',
     tone: 'warm',
     timeOfDay: 'morning',
-    appBg: '#FAF7F2',
+    appBg: '#F6F2ED',
     cardSurface: '#FFFFFF',
     cardBorder: '#F0EAE1',
-    primaryAccent: '#F97316',
+    primaryAccent: '#EA580C',
     secondaryAccent: '#D97706',
     textPrimary: '#292524',
     textMuted: '#78716C',
@@ -41,7 +45,7 @@ export const THEMES: Record<ThemeMode, ThemeDefinition> = {
     name: '冰川清晨',
     tone: 'cool',
     timeOfDay: 'morning',
-    appBg: '#F0FDF9',
+    appBg: '#EEF3F3',
     cardSurface: '#FFFFFF',
     cardBorder: '#CCFBF1',
     primaryAccent: '#0D9488',
@@ -58,10 +62,10 @@ export const THEMES: Record<ThemeMode, ThemeDefinition> = {
     name: '暮色暗金',
     tone: 'warm',
     timeOfDay: 'evening',
-    appBg: '#1C1917',
+    appBg: '#12100E',
     cardSurface: '#262320',
     cardBorder: '#3D3833',
-    primaryAccent: '#F59E0B',
+    primaryAccent: '#F5A524',
     secondaryAccent: '#EA580C',
     textPrimary: '#F5F5F4',
     textMuted: '#A8A29E',
@@ -75,10 +79,10 @@ export const THEMES: Record<ThemeMode, ThemeDefinition> = {
     name: '深海极夜',
     tone: 'cool',
     timeOfDay: 'evening',
-    appBg: '#0B0F19',
+    appBg: '#0A0D13',
     cardSurface: '#131C2E',
     cardBorder: '#1E293B',
-    primaryAccent: '#06B6D4',
+    primaryAccent: '#2DD4E8',
     secondaryAccent: '#3B82F6',
     textPrimary: '#F1F5F9',
     textMuted: '#94A3B8',
@@ -89,38 +93,15 @@ export const THEMES: Record<ThemeMode, ThemeDefinition> = {
   },
 };
 
-export const SQUIRCLE_TOKENS = {
-  cardRadius: '20px',
-  cardRadiusRange: { min: 16, max: 24 },
-  pillRadius: '9999px',
-  fabRadius: '22px',
-} as const;
-
 export const SPRING_PHYSICS = {
-  defaultCard: { stiffness: 300, damping: 25 },
-  quickCheckbox: { stiffness: 450, damping: 20 },
-  bottomSheet: { stiffness: 220, damping: 28 },
-  tabSwitch: { stiffness: 320, damping: 26 },
-  modalSpring: { stiffness: 260, damping: 26 },
-  cardExit: { stiffness: 320, damping: 30 },
-  swipeSnap: { stiffness: 350, damping: 28 },
+  defaultCard: { type: 'spring', stiffness: 300, damping: 25 },
+  modalSpring: { type: 'spring', stiffness: 420, damping: 40, mass: 0.9 },
 } as const;
 
-if (typeof window !== 'undefined') {
-  (window as any).__SPRING_PHYSICS__ = SPRING_PHYSICS;
-}
-
-export function computeThemeFromClock(
-  date: Date = new Date(),
-  toneLock: ToneLock = 'warm'
-): ThemeMode {
+/** Morning is 06:00–17:59 local time. */
+export function computeThemeFromClock(date: Date = new Date(), toneLock: ToneLock = 'warm'): ThemeMode {
   const hour = date.getHours();
-  const isMorning = hour >= 6 && hour < 18;
-  const tone = toneLock === 'auto' ? 'warm' : toneLock;
-
-  if (tone === 'warm') {
-    return isMorning ? 'warm-morning' : 'warm-evening';
-  } else {
-    return isMorning ? 'cool-morning' : 'cool-evening';
-  }
+  const timeOfDay = hour >= 6 && hour < 18 ? 'morning' : 'evening';
+  const tone = toneLock === 'cool' ? 'cool' : 'warm';
+  return `${tone}-${timeOfDay}`;
 }
