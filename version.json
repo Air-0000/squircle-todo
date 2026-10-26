@@ -1,0 +1,8 @@
+{
+  "versionCode": 14,
+  "versionName": "1.4.0",
+  "apkUrl": "https://constant-b850m-eagle-wifi6e-ice.taild05f40.ts.net:8443/squircle-todo/squircle-todo_v1.4.0.apk",
+  "apkSize": "3.3MB",
+  "updateLog": "1. 全新原生风格界面：分组列表、底部弹出面板、圆形勾选，四套冷暖日夜主题保留\n2. 新增应用内更新：设置 →「软件更新」一键升级，在家走局域网，在外自动改走国内中转或公网线路\n3. 修复周期任务刷新和数据同步的若干问题，备份文件现在包含面板和专注记录\n4. 新建待办不再默认带 30 天期限，需要时在「执行期限」里打开",
+  "forceUpdate": false
+}
