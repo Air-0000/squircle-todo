@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useToastStore } from '../../stores/useToastStore';
+import { useBackHandler } from '../../hooks/useBackHandler';
 
 /** iOS-style alert driven by `toast.confirm(...)`. */
 export const ConfirmModal: React.FC = () => {
@@ -15,6 +16,7 @@ export const ConfirmModal: React.FC = () => {
     dialog?.onConfirm();
     closeConfirm();
   };
+  useBackHandler(Boolean(dialog), cancel);
 
   return (
     <AnimatePresence>

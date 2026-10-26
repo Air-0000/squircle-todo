@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SPRING_PHYSICS } from '../../constants/themes';
+import { useBackHandler } from '../../hooks/useBackHandler';
 
 export interface SheetAction {
   label: string;
@@ -44,6 +45,7 @@ export const Modal: React.FC<ModalProps> = ({
   bodyClassName = 'px-4 pt-2 pb-6 space-y-6',
   children,
 }) => {
+  useBackHandler(open, onClose);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();

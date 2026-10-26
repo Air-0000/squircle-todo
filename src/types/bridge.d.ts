@@ -37,5 +37,7 @@ declare global {
   interface Window {
     AndroidBridge?: AndroidBridgeInterface;
     __onUpdateEvent?: (event: NativeUpdateEvent) => void;
+    /** Android back key (MainActivity); false lets the app exit. */
+    __onNativeBack?: () => boolean;
   }
 }
