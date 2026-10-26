@@ -21,6 +21,7 @@ import { POMODORO_PRESETS, type FocusMode } from '../../domain/focus';
 import { useFocusStore, useLinkedTask } from '../../stores/useFocusStore';
 import { useTaskStore } from '../../stores/useTaskStore';
 import { applyTheme } from '../../stores/useThemeStore';
+import { useBackHandler } from '../../hooks/useBackHandler';
 import { haptic, nativeBridge } from '../../utils/bridge';
 import { LiquidGlassFlipCard } from './LiquidGlassFlipCard';
 
@@ -44,6 +45,7 @@ const TaskLinker: React.FC = () => {
   const linkTask = useFocusStore(s => s.linkTask);
   const candidates = useTaskStore(s => s.tasks).filter(t => !t.completed && !t.isTemplate);
   const [open, setOpen] = useState(false);
+  useBackHandler(open, () => setOpen(false));
   const pick = (id: string | null) => {
     haptic('light');
     linkTask(id);
@@ -227,6 +229,8 @@ const StopwatchView: React.FC = () => {
 const FocusClockContent: React.FC = () => {
   const { mode, setMode, close, soundEnabled, toggleSound } = useFocusStore();
   const [fullscreen, setFullscreen] = useState(false);
+  // Back minimises to the capsule, like the close button (the timer keeps running).
+  useBackHandler(true, close);
 
   // Dark status bar while the clock is up; restore the theme's on close.
   useEffect(() => {

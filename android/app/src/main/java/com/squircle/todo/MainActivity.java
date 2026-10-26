@@ -157,21 +157,36 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Modern Back Pressed Handling
+        // Back key: the web app is one page whose sheets and tabs are not history entries, so ask it
+        // first (window.__onNativeBack, src/stores/backNavigation.ts). It closes the top sheet or
+        // returns to 待办, and answers false only on a second press at the top level.
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (webView != null && webView.canGoBack()) {
-                    webView.goBack();
-                } else {
-                    setEnabled(false);
-                    getOnBackPressedDispatcher().onBackPressed();
+                if (webView == null) {
+                    leaveApp(this);
+                    return;
                 }
+                webView.evaluateJavascript("window.__onNativeBack ? window.__onNativeBack() : false", result -> {
+                    if ("true".equals(result)) return;
+                    if (webView != null && webView.canGoBack()) {
+                        webView.goBack();
+                    } else {
+                        leaveApp(this);
+                    }
+                });
             }
         });
 
         // Load the HTML entry point hosted via WebViewAssetLoader
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+    }
+
+    /** System default back (finish, or move to the background on Android 12+), then intercept again. */
+    private void leaveApp(OnBackPressedCallback callback) {
+        callback.setEnabled(false);
+        getOnBackPressedDispatcher().onBackPressed();
+        callback.setEnabled(true);
     }
 
     private void injectSafeAreaCssVariables() {

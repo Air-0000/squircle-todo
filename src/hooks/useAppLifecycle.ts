@@ -5,13 +5,14 @@ import { useThemeStore } from '../stores/useThemeStore';
 import { useUIStore } from '../stores/useUIStore';
 import { findAutoPopupBulletin } from '../stores/useBulletinStore';
 import { useUpdateStore } from '../stores/useUpdateStore';
+import { handleBackPress } from '../stores/backNavigation';
 import { nativeBridge } from '../utils/bridge';
 
 const MINUTE = 60_000;
 const BULLETIN_POPUP_DELAY_MS = 1800;
 const UPDATE_CHECK_DELAY_MS = 3000;
 
-/** All app-wide timers: focus clock tick, cycle resets, theme clock, bulletin popup, update check. */
+/** App-wide timers and hooks: focus clock tick, cycle resets, theme clock, bulletin popup, back key, update check. */
 export function useAppLifecycle(): void {
   // Focus timer
   useEffect(() => {
@@ -47,6 +48,14 @@ export function useAppLifecycle(): void {
       if (bulletin && !useUIStore.getState().bulletinDetailId) useUIStore.getState().showBulletin(bulletin.id);
     }, BULLETIN_POPUP_DELAY_MS);
     return () => clearTimeout(id);
+  }, []);
+
+  // Android back key: close the top sheet, else return to 待办, else exit on a second press.
+  useEffect(() => {
+    window.__onNativeBack = () => handleBackPress();
+    return () => {
+      delete window.__onNativeBack;
+    };
   }, []);
 
   // Silent update check on start (Android shell only); the update sheet opens if one is found.
