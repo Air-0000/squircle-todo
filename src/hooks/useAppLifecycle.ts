@@ -4,11 +4,14 @@ import { useTaskStore } from '../stores/useTaskStore';
 import { useThemeStore } from '../stores/useThemeStore';
 import { useUIStore } from '../stores/useUIStore';
 import { findAutoPopupBulletin } from '../stores/useBulletinStore';
+import { useUpdateStore } from '../stores/useUpdateStore';
+import { nativeBridge } from '../utils/bridge';
 
 const MINUTE = 60_000;
 const BULLETIN_POPUP_DELAY_MS = 1800;
+const UPDATE_CHECK_DELAY_MS = 3000;
 
-/** All app-wide timers: focus clock tick, cycle resets, theme clock, bulletin popup. */
+/** All app-wide timers: focus clock tick, cycle resets, theme clock, bulletin popup, update check. */
 export function useAppLifecycle(): void {
   // Focus timer
   useEffect(() => {
@@ -43,6 +46,13 @@ export function useAppLifecycle(): void {
       const bulletin = findAutoPopupBulletin();
       if (bulletin && !useUIStore.getState().bulletinDetailId) useUIStore.getState().showBulletin(bulletin.id);
     }, BULLETIN_POPUP_DELAY_MS);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Silent update check on start (Android shell only); the update sheet opens if one is found.
+  useEffect(() => {
+    if (!nativeBridge.canSelfUpdate()) return;
+    const id = setTimeout(() => useUpdateStore.getState().check(true), UPDATE_CHECK_DELAY_MS);
     return () => clearTimeout(id);
   }, []);
 }

@@ -62,8 +62,13 @@ public class MainActivity extends AppCompatActivity {
         webView.setHorizontalScrollBarEnabled(false);
         setContentView(webView);
 
-        // Native bridge exposed to the web app as window.AndroidBridge
-        webView.addJavascriptInterface(new WebAppInterface(this), "AndroidBridge");
+        // Native bridge exposed to the web app as window.AndroidBridge; update events go back
+        // through window.__onUpdateEvent (JSON is a valid JS object literal).
+        webView.addJavascriptInterface(new WebAppInterface(this, event -> runOnUiThread(() -> {
+            if (webView != null) {
+                webView.evaluateJavascript("window.__onUpdateEvent && window.__onUpdateEvent(" + event + ")", null);
+            }
+        })), "AndroidBridge");
 
         // Safe Area Insets Dispatcher
         ViewCompat.setOnApplyWindowInsetsListener(webView, (v, windowInsets) -> {

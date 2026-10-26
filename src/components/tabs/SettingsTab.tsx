@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, Check, FileSpreadsheet, HardDrive, MessageSquare, Plus, Send, Trash2 } from 'lucide-react';
+import { Bell, Check, FileSpreadsheet, HardDrive, MessageSquare, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
 import { THEME_IDS, THEMES, type ThemeMode, type ToneLock } from '../../constants/themes';
 import { CURRENT_APP_VERSION } from '../../constants/version';
 import { TEMPLATE_LABELS, type PanelTemplateId } from '../../domain/panels';
@@ -8,6 +8,7 @@ import { usePanelStore } from '../../stores/usePanelStore';
 import { useUnreadBulletinCount } from '../../stores/useBulletinStore';
 import { useFeedbackStore } from '../../stores/useFeedbackStore';
 import { useUIStore } from '../../stores/useUIStore';
+import { useUpdateStore } from '../../stores/useUpdateStore';
 import { toast } from '../../stores/useToastStore';
 import { clearAllData, exportCsv } from '../../stores/dataActions';
 import { haptic, nativeBridge } from '../../utils/bridge';
@@ -114,6 +115,29 @@ const PanelsSection: React.FC = () => {
   );
 };
 
+/** Android shell only: opens the update sheet, checking unless an update is already known. */
+const UpdateRow: React.FC = () => {
+  const phase = useUpdateStore(s => s.phase);
+  const hasUpdate = useUpdateStore(s => s.update !== null) && phase !== 'latest';
+  if (!nativeBridge.canSelfUpdate()) return null;
+  const openSheet = () => {
+    useUIStore.getState().open('updateOpen');
+    if (!hasUpdate) useUpdateStore.getState().check();
+  };
+  return (
+    <Section>
+      <Row
+        leading={<RowIcon icon={RefreshCw} className="bg-gray-500 text-white" />}
+        title="软件更新"
+        value={hasUpdate ? undefined : `v${CURRENT_APP_VERSION.versionName}`}
+        trailing={hasUpdate ? <Badge tone="danger">新版本</Badge> : undefined}
+        chevron
+        onClick={openSheet}
+      />
+    </Section>
+  );
+};
+
 export const SettingsTab: React.FC = () => {
   const { autoSwitch, toneLock, setAutoSwitch, setToneLock } = useThemeStore();
   const unread = useUnreadBulletinCount();
@@ -176,6 +200,8 @@ export const SettingsTab: React.FC = () => {
         />
         <Row leading={<RowIcon icon={Trash2} className="bg-rose-500 text-white" />} title="清空所有数据" tone="danger" onClick={clearAll} />
       </Section>
+
+      <UpdateRow />
 
       <p className="text-center text-caption text-theme-text-muted pb-2">
         Squircle To-Do v{CURRENT_APP_VERSION.versionName}

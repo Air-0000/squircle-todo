@@ -8,6 +8,7 @@ import { BulletinModal } from '../modals/BulletinModal';
 import { BulletinListModal } from '../modals/BulletinListModal';
 import { PublishBulletinModal } from '../modals/PublishBulletinModal';
 import { FeedbackModal } from '../modals/FeedbackModal';
+import { UpdateModal } from '../modals/UpdateModal';
 import { GlobalToast } from '../ui/GlobalToast';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { FocusClockModal } from '../focus/FocusClockModal';
@@ -25,6 +26,7 @@ export const ModalHost: React.FC = () => (
     <BulletinModal />
     <PublishBulletinModal />
     <FeedbackModal />
+    <UpdateModal />
     <GlobalToast />
     <ConfirmModal />
     <FocusClockModal />

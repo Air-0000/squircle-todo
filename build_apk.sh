@@ -215,6 +215,8 @@ if command -v apksigner >/dev/null 2>&1; then
         exit 1
     }
     echo "✓ APK digital signature verified successfully."
+    # In-app updates only install over copies signed with the same key (SQUIRCLE_KEYSTORE in android/app/build.gradle).
+    apksigner verify --print-certs "$DEST_ROOT_APK" | grep -m1 'SHA-256' || true
 fi
 
 if command -v sha256sum >/dev/null 2>&1; then

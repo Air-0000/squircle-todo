@@ -30,6 +30,7 @@ interface UIState {
   bulletinListOpen: boolean;
   bulletinDetailId: string | null;
   publishBulletinOpen: boolean;
+  updateOpen: boolean;
 
   setActiveTab: (tab: TabId) => void;
   openAddTask: (context?: Partial<AddTaskContext>) => void;
@@ -50,7 +51,8 @@ type ModalKey =
   | 'feedbackOpen'
   | 'bulletinListOpen'
   | 'bulletinDetailId'
-  | 'publishBulletinOpen';
+  | 'publishBulletinOpen'
+  | 'updateOpen';
 
 const CLOSED: Pick<UIState, ModalKey> = {
   addTask: null,
@@ -62,6 +64,7 @@ const CLOSED: Pick<UIState, ModalKey> = {
   bulletinListOpen: false,
   bulletinDetailId: null,
   publishBulletinOpen: false,
+  updateOpen: false,
 };
 
 export const useUIStore = create<UIState>(set => ({

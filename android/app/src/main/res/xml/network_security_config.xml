@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <!-- The desktop update server answers plain http on the LAN and the tailnet
+         (see AppUpdater); every other connection must be https. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.0.192</domain>
+        <domain includeSubdomains="false">100.99.125.73</domain>
+    </domain-config>
+</network-security-config>

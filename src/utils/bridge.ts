@@ -56,6 +56,23 @@ export const nativeBridge = {
     else window.open(url, '_blank', 'noopener');
   },
 
+  /** True inside an Android shell that can update itself (see useUpdateStore). */
+  canSelfUpdate(): boolean {
+    return typeof native()?.checkForUpdate === 'function';
+  },
+
+  checkForUpdate(): void {
+    native()?.checkForUpdate?.();
+  },
+
+  downloadUpdate(): void {
+    native()?.downloadUpdate?.();
+  },
+
+  cancelUpdateDownload(): void {
+    native()?.cancelUpdateDownload?.();
+  },
+
   /** Screen refresh rate reported by the Android shell; null in a plain browser. */
   displayRefreshRate(): number | null {
     try {

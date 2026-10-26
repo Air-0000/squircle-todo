@@ -30,9 +30,11 @@ import java.nio.charset.StandardCharsets;
 public class WebAppInterface {
     private static final String TAG = "WebAppInterface";
     private final Activity activity;
+    private final AppUpdater updater;
 
-    public WebAppInterface(Activity activity) {
+    public WebAppInterface(Activity activity, AppUpdater.Listener updateListener) {
         this.activity = activity;
+        this.updater = new AppUpdater(activity, updateListener);
     }
 
     @JavascriptInterface
@@ -170,6 +172,23 @@ public class WebAppInterface {
         } catch (Exception e) {
             return 60.0f;
         }
+    }
+
+    // In-app update: results arrive asynchronously through window.__onUpdateEvent.
+
+    @JavascriptInterface
+    public void checkForUpdate() {
+        updater.check();
+    }
+
+    @JavascriptInterface
+    public void downloadUpdate() {
+        updater.download();
+    }
+
+    @JavascriptInterface
+    public void cancelUpdateDownload() {
+        updater.cancel();
     }
 
     @SuppressWarnings("deprecation")
