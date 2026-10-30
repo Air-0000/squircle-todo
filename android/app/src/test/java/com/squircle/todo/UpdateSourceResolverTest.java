@@ -15,7 +15,7 @@ import java.util.List;
 import org.junit.Test;
 
 public class UpdateSourceResolverTest {
-    private static final String LAN = "http://10.0.0.192:8080/squircle-todo/version.json";
+    private static final String LAN = "http://10.0.0.1:8080/squircle-todo/version.json";
     private static final String RELAY = "https://relay.example.com:19846/squircle-todo/version.json";
     private static final String FUNNEL = "https://box.example.ts.net:8443/squircle-todo/version.json";
     private static final List<String> SOURCES = Arrays.asList(LAN, RELAY, FUNNEL);
@@ -59,7 +59,7 @@ public class UpdateSourceResolverTest {
     @Test
     public void downloadPrefersTheLanCopyWhenTheLanAnswered() {
         assertEquals(Arrays.asList(
-                        "http://10.0.0.192:8080/squircle-todo/squircle-todo_v1.4.0.apk",
+                        "http://10.0.0.1:8080/squircle-todo/squircle-todo_v1.4.0.apk",
                         "https://relay.example.com:19846/squircle-todo/squircle-todo_v1.4.0.apk"),
                 UpdateSourceResolver.buildDownloadCandidates(LAN,
                         "https://relay.example.com:19846/squircle-todo/squircle-todo_v1.4.0.apk"));
