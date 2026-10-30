@@ -42,13 +42,13 @@ public final class AppUpdater {
         void onEvent(JSONObject event);
     }
 
-    // Desktop update server on the LAN: fastest at home.
-    static final String LAN_SOURCE = "http://10.0.0.192:8080/squircle-todo/version.json";
+    // Update server on the router (LAN): fastest at home.
+    static final String LAN_SOURCE = "http://10.0.0.1:8080/squircle-todo/version.json";
     // Same server through the SakuraFrp relay in Changsha (public CA certificate): used off the LAN.
     static final String RELAY_SOURCE = "https://www.haa95d85b.nyat.app:19846/squircle-todo/version.json";
     // Same server through Tailscale Funnel (entry overseas, slow): last resort.
     static final String FUNNEL_SOURCE =
-            "https://constant-b850m-eagle-wifi6e-ice.taild05f40.ts.net:8443/squircle-todo/version.json";
+            "https://arthur.taild05f40.ts.net:8443/squircle-todo/version.json";
 
     private static final String TAG = "AppUpdater";
     // LAN addresses never connect off the LAN, so give up on them quickly.
